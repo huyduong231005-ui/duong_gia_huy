@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { authRouter, requireAuth, HttpError } from './auth.js';
 import { adminRouter } from './admin.js';
 import { teachingRouter } from './teaching.js';
+import { faceRouter } from './face.js';
 
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_REQUESTS = 100;
@@ -19,6 +20,7 @@ export function createApp({ sendMail, verifyGoogle, jwtSecret }) {
     authRouter({ sendMail, verifyGoogle, jwtSecret }),
   );
   app.get('/me', requireAuth(jwtSecret), (req, res) => res.json(req.user));
+  app.use(faceRouter({ jwtSecret })); // trước teachingRouter vì /auth/face không cần token
   app.use('/admin', requireAuth(jwtSecret, 'admin'), adminRouter());
   app.use(requireAuth(jwtSecret), teachingRouter({ qrSecret: jwtSecret }));
 

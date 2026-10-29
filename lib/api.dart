@@ -32,6 +32,7 @@ class AppUser {
     required this.email,
     required this.fullName,
     required this.role,
+    this.hasFace = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -40,6 +41,7 @@ class AppUser {
         email: j['email'] as String,
         fullName: j['fullName'] as String? ?? '',
         role: j['role'] as String,
+        hasFace: j['hasFace'] == true,
       );
 
   final String id;
@@ -47,6 +49,7 @@ class AppUser {
   final String email;
   final String fullName;
   final String role; // admin | lecturer | student
+  final bool hasFace; // đã bật đăng nhập bằng khuôn mặt
 
   String get displayName => fullName.isEmpty ? username : fullName;
 }
@@ -142,6 +145,16 @@ class Api {
 
   Future<AppUser> loginWithGoogle(String idToken) async =>
       _saveSession(await _send('POST', '/auth/google', {'idToken': idToken}));
+
+  /// [embeddings]: vector của các ảnh vừa chụp; server lấy ảnh khớp nhất.
+  Future<AppUser> loginWithFace(String username, List<List<double>> embeddings) async =>
+      _saveSession(await _send('POST', '/auth/face', {'username': username, 'embeddings': embeddings}));
+
+  Future<AppUser> saveFace(List<double> embedding) async =>
+      AppUser.fromJson(await _send('PUT', '/me/face', {'embedding': embedding}) as Map<String, dynamic>);
+
+  Future<AppUser> deleteFace() async =>
+      AppUser.fromJson(await _send('DELETE', '/me/face') as Map<String, dynamic>);
 
   /// Mở app: còn token hợp lệ thì vào thẳng, không thì về màn đăng nhập.
   Future<AppUser?> restoreSession() async {

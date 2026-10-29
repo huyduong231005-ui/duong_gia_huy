@@ -11,12 +11,16 @@ const userSchema = new mongoose.Schema(
     googleId: { type: String, unique: true, sparse: true },
     role: { type: String, enum: ROLES, default: 'student' },
     active: { type: Boolean, default: false }, // true sau khi xác minh email
+    // Vector khuôn mặt FaceNet-512 (không phải ảnh); không bao giờ trả về cho client
+    faceEmbedding: { type: [Number], select: false, default: undefined },
+    faceUpdatedAt: Date,
+    faceFails: { type: Number, default: 0 }, // sai liên tiếp; quá giới hạn thì phải dùng mật khẩu
   },
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, { _id, username, email, fullName, role, active }) =>
-        ({ id: _id, username, email, fullName, role, active }),
+      transform: (_doc, { _id, username, email, fullName, role, active, faceUpdatedAt }) =>
+        ({ id: _id, username, email, fullName, role, active, hasFace: Boolean(faceUpdatedAt) }),
     },
   },
 );

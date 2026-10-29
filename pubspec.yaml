@@ -42,6 +42,10 @@ dependencies:
   geolocator: ^14.1.2
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
+  camera: 0.12.1
+  google_mlkit_face_detection: 0.15.1
+  tflite_flutter: 0.12.1
+  image: 4.10.1
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +68,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Model FaceNet-512 nhận diện khuôn mặt (đầu vào 160x160x3, đầu ra vector 512 chiều), lấy từ project faceid.
+  assets:
+    - assets/models/facenet_512.tflite
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -123,6 +123,10 @@ export function authRouter({ sendMail, verifyGoogle, jwtSecret }) {
     const user = await User.findOne({ username: str(req.body?.username).toLowerCase() });
     if (!user?.active) throw new HttpError(400, 'Tài khoản không hợp lệ');
     await consumeOtp(user, 'login', req.body?.code);
+    if (user.faceFails) {
+      user.faceFails = 0; // đăng nhập mật khẩu + OTP thành công thì mở lại đăng nhập bằng mặt
+      await user.save();
+    }
     res.json(session(user));
   });
 

@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../api.dart';
 import '../main.dart';
 import 'auth_widgets.dart';
+import 'face_scan_screen.dart';
 import 'otp_screen.dart';
 import 'register_screen.dart';
 
@@ -53,6 +54,19 @@ class _LoginScreenState extends State<LoginScreen> {
           resend: () => api.login(username, password),
         ),
       ));
+    });
+  }
+
+  Future<void> _loginWithFace() async {
+    final username = _username.text.trim().toLowerCase();
+    if (username.isEmpty) return showError(context, 'Nhập tên đăng nhập trước, rồi bấm đăng nhập bằng khuôn mặt');
+    final shots = await Navigator.of(context).push<List<List<double>>>(MaterialPageRoute(
+      builder: (_) => const FaceScanScreen(title: 'Đăng nhập bằng khuôn mặt', shots: 2),
+    ));
+    if (shots == null || !mounted) return;
+    await _run(() async {
+      final user = await api.loginWithFace(username, shots);
+      if (mounted) goHome(context, user);
     });
   }
 
@@ -126,6 +140,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Expanded(child: Divider()),
                 ]),
                 const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _loginWithFace,
+                  icon: const Icon(Icons.face_retouching_natural),
+                  label: const Text('Đăng nhập bằng khuôn mặt'),
+                ),
+                const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _loading ? null : _loginWithGoogle,
                   icon: const Icon(Icons.g_mobiledata_rounded, size: 32),
