@@ -301,6 +301,47 @@ class _ClassHeader extends StatelessWidget {
       );
 }
 
+/// Nút kiểm tra đột xuất + kết quả lượt gần nhất (kéo xuống để cập nhật).
+class _SpotCheckPanel extends StatelessWidget {
+  const _SpotCheckPanel({required this.session, required this.onStart});
+  final Json session;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final checks = ((session['spotChecks'] as List?) ?? const []).cast<Json>();
+    final last = checks.isEmpty ? null : checks.last;
+    final expires = last == null ? null : DateTime.parse(last['expiresAt'] as String).toLocal();
+    final running = expires != null && expires.isAfter(DateTime.now());
+    final targets = ((last?['targets'] as List?) ?? const []).cast<Json>();
+    final done = targets.where((t) => t['respondedAt'] != null).length;
+    String hhmm(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+    return Card(
+      color: Theme.of(context).colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (last != null) ...[
+            Text(
+              running
+                  ? 'Đang kiểm tra đột xuất (hạn ${hhmm(expires)}): $done/${targets.length} SV đã xác minh'
+                  : 'Lượt kiểm tra lúc ${hhmm(DateTime.parse(last['startedAt'] as String).toLocal())}: '
+                      '$done/${targets.length} xác minh, ${targets.length - done} rời lớp sớm',
+            ),
+            const SizedBox(height: 8),
+          ],
+          FilledButton.tonalIcon(
+            onPressed: session['open'] == true && !running ? onStart : null,
+            icon: const Icon(Icons.notification_important_outlined),
+            label: const Text('Kiểm tra đột xuất giữa giờ'),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 // ---------------- Điểm danh 1 buổi (giảng viên) ----------------
 
 class SessionScreen extends StatefulWidget {
@@ -328,6 +369,24 @@ class _SessionScreenState extends State<SessionScreen> {
 
   Future<void> _change(Future<void> Function() action) async {
     if (await runApi(context, action)) _reload();
+  }
+
+  Future<void> _startSpotCheck(Json s) async {
+    final saved = await showFormSheet(
+      context,
+      title: 'Kiểm tra đột xuất',
+      fields: [
+        const FieldSpec('percent', 'Gọi ngẫu nhiên bao nhiêu SV đang có mặt',
+            kind: FieldKind.select,
+            initial: '50',
+            options: {'30': '30%', '50': '50%', '100': 'Tất cả'},
+            hint: 'SV có 2 phút để xác minh lại bằng khuôn mặt + GPS'),
+      ],
+      onSubmit: (v) => api.post('$_path/spot-checks', {'percent': int.parse(v['percent'] as String)}),
+    );
+    if (!saved || !mounted) return;
+    showError(context, 'Đã gửi yêu cầu xác minh, hạn 2 phút');
+    _reload();
   }
 
   Future<void> _editTopic(Json s) async {
@@ -397,6 +456,8 @@ class _SessionScreenState extends State<SessionScreen> {
                               for (final e in attendanceLabels.entries)
                                 Chip(label: Text('${e.value}: ${count[e.key]}')),
                             ]),
+                            const SizedBox(height: 8),
+                            _SpotCheckPanel(session: s, onStart: () => _startSpotCheck(s)),
                             const SizedBox(height: 8),
                             if (records.isEmpty)
                               const Padding(padding: EdgeInsets.all(32), child: Center(child: Text('Lớp chưa có sinh viên'))),

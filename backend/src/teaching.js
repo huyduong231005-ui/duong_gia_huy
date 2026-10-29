@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { ClassSection, Session, LeaveRequest, ATTENDANCE } from './models.js';
 import { HttpError, str } from './auth.js';
 import { pick } from './admin.js';
-import { QR_WINDOW_MS, qrToken, qrWindow, verifyQr, distanceM } from './checkin.js';
+import { QR_WINDOW_MS, qrToken, qrWindow, verifyQr, checkLocation } from './checkin.js';
 
 const ABSENCE_LIMIT = 0.2; // vắng quá 20% số buổi thì bị cấm thi
 const USER_FIELDS = 'username fullName email';
@@ -14,7 +14,7 @@ const scopeOf = (user) =>
 
 const isTeacher = (user) => user.role === 'lecturer' || user.role === 'admin';
 
-function requireTeacher(user) {
+export function requireTeacher(user) {
   if (!isTeacher(user)) throw new HttpError(403, 'Chỉ giảng viên mới làm được việc này');
 }
 
@@ -27,7 +27,7 @@ async function findClass(id, user) {
 }
 
 /** Tìm buổi học và kiểm tra người gọi có quyền với lớp của buổi đó. */
-async function findSession(id, user) {
+export async function findSession(id, user) {
   const session = await Session.findById(id);
   if (!session) throw new HttpError(404, 'Không tìm thấy buổi học');
   await findClass(session.classSection, user);
@@ -123,18 +123,7 @@ export function teachingRouter({ qrSecret }) {
     if (record.status === 'present' || record.status === 'late') {
       throw new HttpError(409, 'Bạn đã điểm danh buổi này rồi');
     }
-    if (req.body?.mocked === true) throw new HttpError(400, 'Phát hiện vị trí giả lập, hãy tắt ứng dụng fake GPS');
-    const lat = Number(req.body?.lat);
-    const lng = Number(req.body?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new HttpError(400, 'Thiếu vị trí GPS');
-
-    let distance = null;
-    if (session.lat != null && session.lng != null) {
-      distance = Math.round(distanceM(session.lat, session.lng, lat, lng));
-      if (distance > session.radius) {
-        throw new HttpError(400, `Bạn đang cách lớp khoảng ${distance} m (cho phép ${session.radius} m)`);
-      }
-    }
+    const { lat, lng, distance } = checkLocation(session, req.body);
     Object.assign(record, { status: 'present', checkedAt: new Date(), lat, lng, distance });
     await session.save();
     await session.populate({ path: 'classSection', select: 'code subject', populate: { path: 'subject', select: 'name' } });
@@ -175,6 +164,7 @@ export function teachingRouter({ qrSecret }) {
         .filter((s) => s.classSection.equals(cls._id))
         .map((s) => ({ id: s.id, date: s.date, topic: s.topic, status: statusOf(s, req.user._id) }));
       const count = (st) => mine.filter((s) => s.status === st).length;
+      const missed = count('absent') + count('left'); // rời lớp sớm tính như vắng
       const allowedAbsences = Math.floor(cls.plannedSessions * ABSENCE_LIMIT);
       return {
         classSection: { id: cls.id, code: cls.code, subject: cls.subject?.name ?? '', plannedSessions: cls.plannedSessions },
@@ -184,9 +174,10 @@ export function teachingRouter({ qrSecret }) {
           present: count('present'),
           late: count('late'),
           absent: count('absent'),
+          left: count('left'),
           excused: count('excused'),
           allowedAbsences,
-          remainingAbsences: allowedAbsences - count('absent'),
+          remainingAbsences: allowedAbsences - missed,
         },
       };
     }));

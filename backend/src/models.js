@@ -39,7 +39,8 @@ export const Otp = mongoose.model('Otp', otpSchema);
 
 // ---- Dữ liệu điểm danh ----
 
-export const ATTENDANCE = ['present', 'late', 'absent', 'excused'];
+// left = rời lớp sớm: không xác minh được khi bị kiểm tra đột xuất giữa giờ
+export const ATTENDANCE = ['present', 'late', 'absent', 'excused', 'left'];
 export const LEAVE_STATUS = ['pending', 'approved', 'rejected'];
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/; // ngày dạng YYYY-MM-DD, so khớp theo ngày cho đơn giản
 
@@ -85,6 +86,22 @@ const recordSchema = new mongoose.Schema(
   { _id: false },
 );
 
+// Kiểm tra đột xuất giữa giờ: SV bị chọn chuyển sang "rời lớp sớm" ngay khi tạo,
+// xác minh kịp (mặt + GPS) thì trả lại trạng thái cũ → không cần tác vụ nền xử lý hết giờ.
+const spotCheckSchema = new mongoose.Schema(
+  {
+    startedAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date, required: true },
+    targets: [
+      new mongoose.Schema(
+        { student: ref('User'), prevStatus: String, respondedAt: Date, distance: Number },
+        { _id: false },
+      ),
+    ],
+  },
+  { toJSON: options.toJSON },
+);
+
 const sessionSchema = new mongoose.Schema(
   {
     classSection: { ...ref('ClassSection'), required: true, index: true },
@@ -96,6 +113,7 @@ const sessionSchema = new mongoose.Schema(
     lng: { type: Number, min: -180, max: 180 },
     radius: { type: Number, min: 10, max: 1000, default: 100 },
     records: [recordSchema],
+    spotChecks: [spotCheckSchema],
   },
   options,
 );

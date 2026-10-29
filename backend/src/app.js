@@ -4,6 +4,7 @@ import { authRouter, requireAuth, HttpError } from './auth.js';
 import { adminRouter } from './admin.js';
 import { teachingRouter } from './teaching.js';
 import { faceRouter } from './face.js';
+import { spotCheckRouter } from './spotcheck.js';
 
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_REQUESTS = 100;
@@ -23,6 +24,7 @@ export function createApp({ sendMail, verifyGoogle, jwtSecret }) {
   app.use(faceRouter({ jwtSecret })); // trước teachingRouter vì /auth/face không cần token
   app.use('/admin', requireAuth(jwtSecret, 'admin'), adminRouter());
   app.use(requireAuth(jwtSecret), teachingRouter({ qrSecret: jwtSecret }));
+  app.use(spotCheckRouter({ jwtSecret }));
 
   app.use((_req, _res, next) => next(new HttpError(404, 'Không tìm thấy API')));
   // eslint-disable-next-line no-unused-vars

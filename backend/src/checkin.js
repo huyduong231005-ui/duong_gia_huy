@@ -37,6 +37,23 @@ export function verifyQr(token, secret, now = Date.now()) {
   return sessionId;
 }
 
+/**
+ * Kiểm vị trí SV gửi lên so với vị trí GV của buổi học (dùng chung cho quét QR và kiểm tra đột xuất).
+ * Trả về { lat, lng, distance } (distance null nếu GV chưa ghim vị trí), sai thì ném HttpError.
+ */
+export function checkLocation(session, body) {
+  if (body?.mocked === true) throw new HttpError(400, 'Phát hiện vị trí giả lập, hãy tắt ứng dụng fake GPS');
+  const lat = Number(body?.lat);
+  const lng = Number(body?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new HttpError(400, 'Thiếu vị trí GPS');
+  if (session.lat == null || session.lng == null) return { lat, lng, distance: null };
+  const distance = Math.round(distanceM(session.lat, session.lng, lat, lng));
+  if (distance > session.radius) {
+    throw new HttpError(400, `Bạn đang cách lớp khoảng ${distance} m (cho phép ${session.radius} m)`);
+  }
+  return { lat, lng, distance };
+}
+
 /** Khoảng cách 2 toạ độ (mét), công thức haversine. */
 export function distanceM(lat1, lng1, lat2, lng2) {
   const rad = (d) => (d * Math.PI) / 180;

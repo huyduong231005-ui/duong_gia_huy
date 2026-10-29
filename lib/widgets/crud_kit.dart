@@ -6,7 +6,13 @@ import '../screens/auth_widgets.dart';
 typedef Json = Map<String, dynamic>;
 
 const roleLabels = {'admin': 'Quản trị', 'lecturer': 'Giảng viên', 'student': 'Sinh viên'};
-const attendanceLabels = {'present': 'Có mặt', 'late': 'Đi muộn', 'absent': 'Vắng', 'excused': 'Có phép'};
+const attendanceLabels = {
+  'present': 'Có mặt',
+  'late': 'Đi muộn',
+  'absent': 'Vắng',
+  'excused': 'Có phép',
+  'left': 'Rời lớp sớm', // không xác minh kịp khi kiểm tra đột xuất
+};
 const leaveLabels = {'pending': 'Chờ duyệt', 'approved': 'Đã duyệt', 'rejected': 'Từ chối'};
 
 const _statusColors = {
@@ -17,6 +23,7 @@ const _statusColors = {
   'absent': Colors.red,
   'rejected': Colors.red,
   'excused': Colors.blue,
+  'left': Colors.purple,
 };
 
 /// Ngày hôm nay dạng YYYY-MM-DD (giờ máy).

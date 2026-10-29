@@ -10,7 +10,7 @@ export const FACE_THRESHOLD = 0.65;
 export const MAX_FACE_FAILS = 5;
 const MAX_SAMPLES = 3;
 
-function isEmbedding(v) {
+export function isEmbedding(v) {
   if (!Array.isArray(v) || v.length !== EMBEDDING_LENGTH || !v.every(Number.isFinite)) return false;
   const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
   return Math.abs(norm - 1) < 0.05; // phải là vector đã chuẩn hoá

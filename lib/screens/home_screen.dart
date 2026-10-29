@@ -10,6 +10,7 @@ import 'class_screens.dart';
 import 'leaves_screen.dart';
 import 'login_screen.dart';
 import 'qr_screens.dart';
+import 'spot_check_screen.dart';
 
 /// Ô chức năng trên trang chủ; [open] null = chưa làm (QR, thống kê… gắn ở bước sau).
 typedef HomeItem = (IconData icon, String label, Widget Function()? open);
@@ -57,7 +58,8 @@ class StudentHome extends StatelessWidget {
   final AppUser user;
 
   @override
-  Widget build(BuildContext context) => _RoleHome(
+  Widget build(BuildContext context) => SpotCheckWatcher(
+      child: _RoleHome(
         user: user,
         title: 'Sinh viên',
         roleLabel: 'Sinh viên',
@@ -68,7 +70,7 @@ class StudentHome extends StatelessWidget {
           (Icons.edit_note, 'Xin nghỉ phép', () => LeavesScreen(me: user)),
           (Icons.qr_code_scanner, 'Quét QR điểm danh', () => const ScanCheckinScreen()),
         ],
-      );
+      ));
 }
 
 /// Bật / đăng ký lại / tắt đăng nhập bằng khuôn mặt.
