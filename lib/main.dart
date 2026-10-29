@@ -72,7 +72,7 @@ class DiemDanhApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         navigatorKey: navigatorKey,
         scaffoldMessengerKey: messengerKey,
-        title: 'Điểm danh SV',
+        title: 'duong_gia_huy', // tên trong danh sách ứng dụng gần đây; tên dưới icon ở AndroidManifest
         debugShowCheckedModeBanner: false,
         theme: _theme(Brightness.light),
         darkTheme: _theme(Brightness.dark),
