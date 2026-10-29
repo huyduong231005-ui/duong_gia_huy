@@ -44,9 +44,11 @@ export function faceRouter({ jwtSecret }) {
     if (!Array.isArray(samples) || samples.length === 0 || samples.length > MAX_SAMPLES || !samples.every(isEmbedding)) {
       throw new HttpError(400, 'Dữ liệu khuôn mặt không hợp lệ');
     }
-    const user = await User.findOne({ username: str(req.body?.username).toLowerCase() }).select('+faceEmbedding');
+    const username = str(req.body?.username).toLowerCase();
+    const user = await User.findOne({ username }).select('+faceEmbedding');
     if (!user?.active || !user.faceEmbedding?.length) {
-      throw new HttpError(400, 'Tài khoản này chưa bật đăng nhập bằng khuôn mặt');
+      // Nêu tên đã gửi để người dùng thấy ngay nếu gõ nhầm tài khoản (cùng câu cho tài khoản không tồn tại)
+      throw new HttpError(400, `Tài khoản "${username}" chưa bật đăng nhập bằng khuôn mặt`);
     }
     if (user.faceFails >= MAX_FACE_FAILS) {
       throw new HttpError(403, 'Sai khuôn mặt quá nhiều lần, hãy đăng nhập bằng mật khẩu + OTP');
