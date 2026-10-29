@@ -3,26 +3,81 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Điểm danh SV</title>
+  <title>duong_gia_huy API</title>
   <style>
-    body { margin: 0; font-family: system-ui, sans-serif; background: #f0fdfa; color: #134e4a; line-height: 1.6; }
-    main { max-width: 640px; margin: 0 auto; padding: 48px 16px; }
-    h1 { margin: 0 0 8px; }
-    a { color: #0f766e; }
-    li { margin: 4px 0; }
+    :root { --bg: #0b1220; --card: #111a2e; --text: #e2e8f0; --muted: #94a3b8; --line: #1e293b; --accent: #2dd4bf; }
+    body { margin: 0; font-family: ui-monospace, Consolas, monospace; background: var(--bg); color: var(--text); font-size: 14px; }
+    main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+    h1 { font-size: 26px; margin: 0 0 4px; }
+    h2 { font-size: 16px; color: var(--accent); margin: 28px 0 8px; }
+    .muted { color: var(--muted); }
+    .status { display: inline-block; margin-top: 12px; padding: 4px 10px; border-radius: 6px; background: var(--card); }
+    .ok { color: #4ade80; } .bad { color: #f87171; }
+    code { background: var(--card); padding: 2px 6px; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; overflow: hidden; }
+    td { padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+    tr:first-child td { border-top: 0; }
+    .m { font-weight: 700; width: 64px; } .GET { color: #60a5fa; } .POST { color: #4ade80; } .PATCH { color: #facc15; } .PUT { color: #c084fc; } .DELETE { color: #f87171; }
+    .p { white-space: nowrap; } .r { color: var(--muted); width: 110px; }
+    a { color: var(--accent); }
   </style>
 </head>
 <body>
 <main>
-  <h1>Điểm danh SV</h1>
-  <p>Ứng dụng di động điểm danh sinh viên – đồ án môn Lập trình thiết bị di động, nhóm <b>4 con tuất</b>.</p>
-  <ul>
-    <li>Đăng nhập bằng mật khẩu + mã OTP qua email, Google hoặc khuôn mặt</li>
-    <li>Điểm danh bằng mã QR động kèm kiểm tra vị trí GPS</li>
-    <li>Kiểm tra đột xuất giữa giờ, đơn xin nghỉ, theo dõi số buổi còn được vắng</li>
-  </ul>
-  <p>Đây là máy chủ API của ứng dụng; ứng dụng chỉ có trên Android.</p>
-  <p><a href="/privacy">Chính sách quyền riêng tư</a> · Liên hệ: <a href="mailto:huyduong455@gmail.com">huyduong455@gmail.com</a></p>
+  <h1>duong_gia_huy API</h1>
+  <div class="muted">REST API cho app Flutter điểm danh sinh viên · Node.js + Express + MongoDB Atlas · deploy Render · nhóm 4 con tuất</div>
+  <div class="status">GET <a href="/health">/health</a> → <span id="health">đang kiểm tra…</span></div>
+  <p class="muted">Base URL: <code id="base"></code> · Dữ liệu JSON · Xác thực: <code>Authorization: Bearer &lt;JWT&gt;</code> · Lỗi: <code>{"message": "..."}</code></p>
+
+  <h2>Xác thực</h2>
+  <table>
+    <tr><td class="m POST">POST</td><td class="p">/auth/register</td><td>Đăng ký bằng email → gửi OTP</td><td class="r">công khai</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/auth/register/verify</td><td>Xác minh OTP đăng ký → JWT</td><td class="r">công khai</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/auth/login</td><td>Tên đăng nhập + mật khẩu → gửi Email OTP</td><td class="r">công khai</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/auth/login/verify</td><td>Xác minh OTP đăng nhập → JWT</td><td class="r">công khai</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/auth/google</td><td>Đăng nhập Google OAuth 2.0 (xác thực idToken) → JWT</td><td class="r">công khai</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/auth/face</td><td>Đăng nhập bằng khuôn mặt (vector FaceNet-512) → JWT</td><td class="r">công khai</td></tr>
+    <tr><td class="m GET">GET</td><td class="p">/me</td><td>Thông tin tài khoản đang đăng nhập</td><td class="r">đã đăng nhập</td></tr>
+    <tr><td class="m PUT">PUT</td><td class="p">/me/face · DELETE /me/face</td><td>Bật / tắt đăng nhập bằng khuôn mặt</td><td class="r">đã đăng nhập</td></tr>
+  </table>
+
+  <h2>Quản trị (CRUD)</h2>
+  <table>
+    <tr><td class="m GET">GET</td><td class="p">/admin/users</td><td>Danh sách tài khoản (lọc vai trò, tìm kiếm) · POST tạo · PATCH /:id sửa · DELETE /:id xoá</td><td class="r">admin</td></tr>
+    <tr><td class="m GET">GET</td><td class="p">/admin/subjects</td><td>Môn học · POST · PATCH /:id · DELETE /:id</td><td class="r">admin</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/admin/classes</td><td>Lớp học phần + thời khoá biểu · PATCH /:id · DELETE /:id</td><td class="r">admin</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/admin/classes/:id/students</td><td>Ghi danh sinh viên · DELETE /:id/students/:sid</td><td class="r">admin</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/admin/import</td><td>Nhập file Excel thời khoá biểu + danh sách SV (<a href="/mau-import.xlsx">file mẫu</a>)</td><td class="r">admin</td></tr>
+  </table>
+
+  <h2>Lớp học, buổi học, điểm danh</h2>
+  <table>
+    <tr><td class="m GET">GET</td><td class="p">/classes · /classes/:id</td><td>Lớp học phần (tự lọc theo vai trò)</td><td class="r">đã đăng nhập</td></tr>
+    <tr><td class="m GET">GET</td><td class="p">/me/today</td><td>Lịch học hôm nay theo thời khoá biểu</td><td class="r">GV, SV</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/classes/:id/sessions</td><td>Mở buổi điểm danh (ngoài giờ TKB → buổi bù) · GET danh sách buổi</td><td class="r">GV</td></tr>
+    <tr><td class="m PATCH">PATCH</td><td class="p">/sessions/:id</td><td>Sửa, đóng / mở buổi, ghim vị trí GV · GET chi tiết · DELETE xoá</td><td class="r">GV</td></tr>
+    <tr><td class="m PATCH">PATCH</td><td class="p">/sessions/:id/records/:sid</td><td>Đổi trạng thái điểm danh 1 SV</td><td class="r">GV</td></tr>
+    <tr><td class="m GET">GET</td><td class="p">/sessions/:id/qr</td><td>Mã QR động ký HMAC, đổi mỗi 60 giây</td><td class="r">GV</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/checkin</td><td>Quét QR + GPS (bán kính 100 m, chặn GPS giả)</td><td class="r">SV</td></tr>
+    <tr><td class="m GET">GET</td><td class="p">/me/attendance</td><td>Lịch sử chuyên cần, số buổi còn được vắng</td><td class="r">SV</td></tr>
+  </table>
+
+  <h2>Kiểm tra đột xuất &amp; đơn xin nghỉ</h2>
+  <table>
+    <tr><td class="m POST">POST</td><td class="p">/sessions/:id/spot-checks</td><td>Gọi ngẫu nhiên SV xác minh lại trong 2 phút</td><td class="r">GV</td></tr>
+    <tr><td class="m GET">GET</td><td class="p">/me/spot-check</td><td>SV kiểm tra có bị gọi không</td><td class="r">SV</td></tr>
+    <tr><td class="m POST">POST</td><td class="p">/spot-checks/respond</td><td>Xác minh bằng khuôn mặt + GPS</td><td class="r">SV</td></tr>
+    <tr><td class="m GET">GET</td><td class="p">/leaves</td><td>Đơn xin nghỉ · POST gửi (SV) · PATCH duyệt / sửa · DELETE rút</td><td class="r">đã đăng nhập</td></tr>
+  </table>
+
+  <p class="muted" style="margin-top:24px"><a href="/privacy">Chính sách quyền riêng tư</a> · Mã nguồn: <a href="https://github.com/huyduong231005-ui/duong_gia_huy">github.com/huyduong231005-ui/duong_gia_huy</a></p>
 </main>
+<script>
+  document.getElementById('base').textContent = location.origin;
+  const el = document.getElementById('health');
+  fetch('/health').then((r) => r.json())
+    .then((d) => { el.textContent = d.ok ? '{"ok":true} – đang hoạt động' : 'lỗi'; el.className = d.ok ? 'ok' : 'bad'; })
+    .catch(() => { el.textContent = 'không kết nối được'; el.className = 'bad'; });
+</script>
 </body>
 </html>
