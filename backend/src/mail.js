@@ -14,7 +14,9 @@ export function brevoMailer({ apiKey, from }) {
       body: JSON.stringify({
         sender: { email: from, name: 'Điểm danh SV' },
         to: [{ email: to }],
-        subject: SUBJECTS[purpose],
+        // Mã đặt đầu tiêu đề: mỗi thư một tiêu đề nên Gmail không gộp vào luồng cũ (dễ đọc nhầm mã cũ)
+        // và thấy mã ngay ở danh sách thư / thông báo, không cần mở thư.
+        subject: `${code} – ${SUBJECTS[purpose]}`,
         htmlContent: `<p>Mã OTP của bạn là:</p><h2 style="letter-spacing:4px">${code}</h2><p>Mã có hiệu lực trong 5 phút. Không chia sẻ mã này cho ai.</p>`,
       }),
     });
