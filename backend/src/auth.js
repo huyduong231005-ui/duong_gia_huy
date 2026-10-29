@@ -7,9 +7,9 @@ import { User, Otp } from './models.js';
 const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const TOKEN_TTL = '7d';
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USERNAME_RE = /^[a-z0-9_.]{3,30}$/;
-const MIN_PASSWORD = 6;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const USERNAME_RE = /^[a-z0-9_.]{3,30}$/;
+export const MIN_PASSWORD = 6;
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -20,7 +20,7 @@ export class HttpError extends Error {
 
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const maskEmail = (email) => email.replace(/^(.).*(@.*)$/, '$1***$2');
-const str = (v) => (typeof v === 'string' ? v.trim() : '');
+export const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
 export function signToken(user, jwtSecret) {
   return jwt.sign({ sub: user.id, role: user.role }, jwtSecret, { expiresIn: TOKEN_TTL });

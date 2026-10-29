@@ -32,3 +32,75 @@ otpSchema.index({ userId: 1, purpose: 1 }, { unique: true });
 
 export const User = mongoose.model('User', userSchema);
 export const Otp = mongoose.model('Otp', otpSchema);
+
+// ---- Dữ liệu điểm danh ----
+
+export const ATTENDANCE = ['present', 'late', 'absent', 'excused'];
+export const LEAVE_STATUS = ['pending', 'approved', 'rejected'];
+export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/; // ngày dạng YYYY-MM-DD, so khớp theo ngày cho đơn giản
+
+const ref = (model) => ({ type: mongoose.Types.ObjectId, ref: model });
+const options = {
+  timestamps: true,
+  toJSON: { virtuals: true, versionKey: false, transform: (_doc, ret) => { delete ret._id; return ret; } },
+};
+
+const subjectSchema = new mongoose.Schema(
+  {
+    code: { type: String, required: true, unique: true, uppercase: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    credits: { type: Number, min: 1, max: 10, default: 3 },
+  },
+  options,
+);
+
+const classSchema = new mongoose.Schema(
+  {
+    code: { type: String, required: true, unique: true, uppercase: true, trim: true },
+    subject: { ...ref('Subject'), required: true },
+    lecturer: { ...ref('User'), required: true },
+    room: { type: String, default: '', trim: true },
+    schedule: { type: String, default: '', trim: true }, // VD: "Thứ 2, tiết 1-3"
+    semester: { type: String, default: '', trim: true },
+    plannedSessions: { type: Number, min: 1, max: 100, default: 15 }, // để tính số buổi được vắng (20%)
+    students: [ref('User')],
+  },
+  options,
+);
+
+const recordSchema = new mongoose.Schema(
+  {
+    student: ref('User'),
+    status: { type: String, enum: ATTENDANCE, default: 'absent' },
+    checkedAt: Date,
+  },
+  { _id: false },
+);
+
+const sessionSchema = new mongoose.Schema(
+  {
+    classSection: { ...ref('ClassSection'), required: true, index: true },
+    date: { type: String, required: true, match: DATE_RE },
+    topic: { type: String, default: '', trim: true },
+    open: { type: Boolean, default: true },
+    records: [recordSchema],
+  },
+  options,
+);
+
+const leaveSchema = new mongoose.Schema(
+  {
+    classSection: { ...ref('ClassSection'), required: true, index: true },
+    student: { ...ref('User'), required: true, index: true },
+    date: { type: String, required: true, match: DATE_RE },
+    reason: { type: String, required: true, trim: true, maxlength: 500 },
+    status: { type: String, enum: LEAVE_STATUS, default: 'pending' },
+    reviewedBy: ref('User'),
+  },
+  options,
+);
+
+export const Subject = mongoose.model('Subject', subjectSchema);
+export const ClassSection = mongoose.model('ClassSection', classSchema);
+export const Session = mongoose.model('Session', sessionSchema);
+export const LeaveRequest = mongoose.model('LeaveRequest', leaveSchema);

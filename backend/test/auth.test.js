@@ -147,5 +147,8 @@ test('/me cần token hợp lệ', async () => {
 test('JSON hỏng và API lạ trả lỗi gọn', async () => {
   const bad = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{' });
   assert.equal(bad.status, 400);
-  assert.equal((await call('GET', '/khong-co')).status, 404);
+  // API lạ: chưa đăng nhập thì 401 (không lộ đường dẫn nào tồn tại), có token thì 404
+  assert.equal((await call('GET', '/khong-co')).status, 401);
+  const { body } = await registerAndVerify();
+  assert.equal((await call('GET', '/khong-co', null, body.token)).status, 404);
 });

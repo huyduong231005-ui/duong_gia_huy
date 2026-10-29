@@ -64,9 +64,18 @@ class Api {
   final FlutterSecureStorage _storage;
   String? _token;
 
-  Future<Map<String, dynamic>> _send(String method, String path,
-      [Map<String, dynamic>? body]) async {
-    final req = http.Request(method, Uri.parse('$apiUrl$path'))
+  // CRUD chung cho các màn hình: trả về JSON đã giải mã (Map, List hoặc null khi 204).
+  Future<dynamic> get(String path, [Map<String, String>? query]) =>
+      _send('GET', path, null, query);
+  Future<dynamic> post(String path, Map<String, dynamic> body) => _send('POST', path, body);
+  Future<dynamic> patch(String path, Map<String, dynamic> body) => _send('PATCH', path, body);
+  Future<dynamic> delete(String path) => _send('DELETE', path);
+
+  Future<dynamic> _send(String method, String path,
+      [Map<String, dynamic>? body, Map<String, String>? query]) async {
+    var uri = Uri.parse('$apiUrl$path');
+    if (query != null) uri = uri.replace(queryParameters: query);
+    final req = http.Request(method, uri)
       ..headers['content-type'] = 'application/json';
     if (_token != null) req.headers['authorization'] = 'Bearer $_token';
     if (body != null) req.body = jsonEncode(body);
@@ -81,22 +90,21 @@ class Api {
       throw ApiException('Không kết nối được máy chủ, kiểm tra mạng');
     }
 
-    Map<String, dynamic> data;
+    dynamic data;
     try {
       // JSON luôn là UTF-8; không dùng res.body vì thiếu charset thì http giải mã latin1.
-      data = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      if (res.bodyBytes.isNotEmpty) data = jsonDecode(utf8.decode(res.bodyBytes));
     } on FormatException {
-      data = {};
+      data = null;
     }
     if (res.statusCode >= 400) {
-      throw ApiException(
-          data['message'] as String? ?? 'Lỗi máy chủ (${res.statusCode})',
-          res.statusCode);
+      final message = data is Map ? data['message'] as String? : null;
+      throw ApiException(message ?? 'Lỗi máy chủ (${res.statusCode})', res.statusCode);
     }
     return data;
   }
 
-  Future<AppUser> _saveSession(Map<String, dynamic> data) async {
+  Future<AppUser> _saveSession(dynamic data) async {
     _token = data['token'] as String;
     await _storage.write(key: _tokenKey, value: _token);
     return AppUser.fromJson(data['user'] as Map<String, dynamic>);
@@ -115,7 +123,7 @@ class Api {
       'password': password,
       'fullName': fullName,
     });
-    return data['email'] as String;
+    return (data as Map)['email'] as String;
   }
 
   Future<AppUser> verifyRegister(String email, String code) async =>
@@ -125,7 +133,7 @@ class Api {
   Future<String> login(String username, String password) async {
     final data = await _send(
         'POST', '/auth/login', {'username': username, 'password': password});
-    return data['email'] as String;
+    return (data as Map)['email'] as String;
   }
 
   Future<AppUser> verifyLogin(String username, String code) async =>
@@ -140,7 +148,7 @@ class Api {
     _token = await _storage.read(key: _tokenKey);
     if (_token == null) return null;
     try {
-      return AppUser.fromJson(await _send('GET', '/me'));
+      return AppUser.fromJson(await _send('GET', '/me') as Map<String, dynamic>);
     } on ApiException catch (e) {
       if (e.status == 401) await logout();
       return null;
@@ -153,4 +161,5 @@ class Api {
   }
 }
 
-final api = Api();
+// Test thay bằng Api(client: MockClient(...)) để không gọi mạng thật.
+var api = Api();

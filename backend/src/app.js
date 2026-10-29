@@ -1,6 +1,8 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { authRouter, requireAuth, HttpError } from './auth.js';
+import { adminRouter } from './admin.js';
+import { teachingRouter } from './teaching.js';
 
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_REQUESTS = 100;
@@ -17,16 +19,24 @@ export function createApp({ sendMail, verifyGoogle, jwtSecret }) {
     authRouter({ sendMail, verifyGoogle, jwtSecret }),
   );
   app.get('/me', requireAuth(jwtSecret), (req, res) => res.json(req.user));
+  app.use('/admin', requireAuth(jwtSecret, 'admin'), adminRouter());
+  app.use(requireAuth(jwtSecret), teachingRouter());
 
   app.use((_req, _res, next) => next(new HttpError(404, 'Không tìm thấy API')));
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {
-    const status = err.code === 11000 ? 409 : err.status ?? 500;
+    const badId = err.name === 'CastError' && err.kind === 'ObjectId';
+    const status =
+      err.code === 11000 ? 409
+      : badId ? 404
+      : err.name === 'CastError' || err.name === 'ValidationError' ? 400
+      : err.status ?? 500;
     if (status >= 500) console.error(err);
     const message =
       err instanceof HttpError ? err.message
-      : status === 409 ? 'Dữ liệu bị trùng'
-      : status < 500 ? 'Yêu cầu không hợp lệ'
+      : status === 409 ? 'Dữ liệu bị trùng (mã hoặc tên đã tồn tại)'
+      : badId ? 'Không tìm thấy dữ liệu'
+      : status < 500 ? 'Dữ liệu không hợp lệ'
       : 'Lỗi máy chủ';
     res.status(status).json({ message });
   });
