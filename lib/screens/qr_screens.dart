@@ -12,6 +12,7 @@ import '../widgets/crud_kit.dart';
 
 const _gpsTimeout = Duration(seconds: 20);
 const _defaultRadius = 100; // mét
+const _countEverySeconds = 5;
 
 /// Lấy vị trí hiện tại; lỗi quyền / tắt GPS báo bằng ApiException để màn hình hiện như lỗi thường.
 Future<Position> currentPosition() async {
@@ -49,18 +50,32 @@ class _QrDisplayScreenState extends State<QrDisplayScreen> {
   int _present = 0;
   int _total = 0;
   Timer? _timer;
+  Timer? _tick; // đếm ngược tới lúc đổi mã
+  DateTime? _changesAt;
 
   String get _path => '/sessions/${widget.sessionId}';
+
+  int get _secondsLeft {
+    final left = _changesAt?.difference(DateTime.now()).inSeconds ?? 0;
+    return left < 0 ? 0 : left;
+  }
 
   @override
   void initState() {
     super.initState();
     _start();
+    _tick = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_changesAt == null) return;
+      setState(() {});
+      // Mã đổi 60 giây/lần nhưng sĩ số cập nhật mỗi 5 giây để GV thấy SV quét tới đâu
+      if (t.tick % _countEverySeconds == 0) _refreshCount();
+    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _tick?.cancel();
     super.dispose();
   }
 
@@ -76,20 +91,32 @@ class _QrDisplayScreenState extends State<QrDisplayScreen> {
     }
   }
 
+  Future<void> _refreshCount() async {
+    try {
+      final records = (await api.get(_path) as Json)['records'] as List;
+      if (!mounted) return;
+      setState(() {
+        _present = records.where((r) => r['status'] == 'present' || r['status'] == 'late').length;
+        _total = records.length;
+      });
+    } on ApiException {
+      // lỗi thoáng qua: lần sau cập nhật lại
+    }
+  }
+
   /// Lấy mã mới + sĩ số, rồi hẹn lần sau đúng lúc mã đổi.
   Future<void> _refresh() async {
     try {
       final qr = await api.get('$_path/qr') as Json;
-      final session = await api.get(_path) as Json;
-      final records = session['records'] as List;
+      await _refreshCount();
       if (!mounted) return;
+      final refreshIn = Duration(milliseconds: (qr['refreshInMs'] as num).toInt());
       setState(() {
+        _changesAt = DateTime.now().add(refreshIn);
         _token = qr['token'] as String;
-        _present = records.where((r) => r['status'] == 'present' || r['status'] == 'late').length;
-        _total = records.length;
         _error = null;
       });
-      _timer = Timer(Duration(milliseconds: (qr['refreshInMs'] as num).toInt() + 200), _refresh);
+      _timer = Timer(refreshIn + const Duration(milliseconds: 200), _refresh);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     }
@@ -130,7 +157,8 @@ class _QrDisplayScreenState extends State<QrDisplayScreen> {
               Text('$_present / $_total sinh viên đã điểm danh',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              const Text('Mã tự đổi mỗi 10 giây – chụp lại gửi bạn sẽ không dùng được'),
+              Text('Mã đổi sau ${_secondsLeft}s · mỗi mã chỉ dùng được 60 giây'),
+              const Text('Chụp lại gửi bạn ở nhà sẽ hết hạn, không dùng được'),
               const SizedBox(height: 4),
               Text(_status, textAlign: TextAlign.center, style: TextStyle(color: scheme.outline)),
             ],

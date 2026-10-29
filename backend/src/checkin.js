@@ -1,10 +1,12 @@
 // Điểm danh bằng QR động + GPS.
-// QR đổi mỗi 10 giây, ký HMAC bằng khoá của server → chụp mã gửi bạn ở nhà sẽ hết hạn ngay;
+// QR đổi mỗi 60 giây, ký HMAC bằng khoá của server → chụp mã gửi bạn ở nhà sẽ hết hạn sau ~1 phút;
 // SV phải đứng trong bán kính cho phép quanh vị trí GV lúc chiếu QR.
 import crypto from 'node:crypto';
 import { HttpError } from './auth.js';
 
-export const QR_WINDOW_MS = 10_000;
+export const QR_WINDOW_MS = 60_000;
+// Quét đúng lúc mã vừa đổi: mã cũ vẫn nhận thêm chừng này (bù độ trễ camera + mạng)
+export const QR_GRACE_MS = 10_000;
 const EARTH_RADIUS_M = 6_371_000;
 
 export const qrWindow = (now = Date.now()) => Math.floor(now / QR_WINDOW_MS);
@@ -19,7 +21,7 @@ export function qrToken(sessionId, window, secret) {
   return `${sessionId}.${window}.${sig}`;
 }
 
-/** Kiểm chữ ký + hạn dùng, trả về sessionId. Nhận cửa sổ hiện tại và cửa sổ liền trước (bù độ trễ khi quét). */
+/** Kiểm chữ ký + hạn dùng, trả về sessionId. Nhận mã đang chiếu, và mã ngay trước nó trong QR_GRACE_MS đầu tiên sau khi đổi. */
 export function verifyQr(token, secret, now = Date.now()) {
   const raw = typeof token === 'string' ? token : '';
   const [sessionId, w] = raw.split('.');
@@ -31,7 +33,8 @@ export function verifyQr(token, secret, now = Date.now()) {
     throw new HttpError(400, 'Mã QR không hợp lệ');
   }
   const current = qrWindow(now);
-  if (window < current - 1 || window > current) {
+  const justChanged = now - current * QR_WINDOW_MS < QR_GRACE_MS;
+  if (window !== current && !(window === current - 1 && justChanged)) {
     throw new HttpError(400, 'Mã QR đã hết hạn, hãy quét mã mới trên màn hình');
   }
   return sessionId;

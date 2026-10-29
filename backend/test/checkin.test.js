@@ -5,7 +5,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { createApp } from '../src/app.js';
 import { User, Session } from '../src/models.js';
 import { signToken } from '../src/auth.js';
-import { qrToken, qrWindow, verifyQr, distanceM, QR_WINDOW_MS } from '../src/checkin.js';
+import { qrToken, qrWindow, verifyQr, distanceM, QR_WINDOW_MS, QR_GRACE_MS } from '../src/checkin.js';
 
 const SECRET = 'test-secret';
 // Sân trường (toạ độ ví dụ) và 1 điểm cách ~1 km
@@ -64,12 +64,16 @@ test('haversine: 0,009 độ vĩ ≈ 1 km', () => {
   assert.equal(distanceM(1, 2, 1, 2), 0);
 });
 
-test('mã QR: đúng chữ ký, hết hạn sau 2 cửa sổ, sửa 1 ký tự là hỏng', () => {
-  const now = Date.now();
+test('mã QR: dùng được suốt 60 giây đang chiếu + 10 giây bù trễ, sửa 1 ký tự là hỏng', () => {
+  const start = qrWindow() * QR_WINDOW_MS; // đúng lúc mã bắt đầu được chiếu
+  const now = start + 1000;
   const token = qrToken('abc', qrWindow(now), SECRET);
+  assert.equal(QR_WINDOW_MS, 60_000);
   assert.equal(verifyQr(token, SECRET, now), 'abc');
-  assert.equal(verifyQr(token, SECRET, now + QR_WINDOW_MS), 'abc', 'cho trễ 1 cửa sổ');
-  assert.throws(() => verifyQr(token, SECRET, now + 2 * QR_WINDOW_MS), /hết hạn/);
+  assert.equal(verifyQr(token, SECRET, start + 59_000), 'abc', 'giây thứ 59 vẫn được');
+  assert.equal(verifyQr(token, SECRET, start + QR_WINDOW_MS + QR_GRACE_MS - 1), 'abc', 'vừa đổi mã: bù trễ 10 giây');
+  assert.throws(() => verifyQr(token, SECRET, start + QR_WINDOW_MS + QR_GRACE_MS), /hết hạn/);
+  assert.throws(() => verifyQr(token, SECRET, start + 2 * QR_WINDOW_MS), /hết hạn/);
   assert.throws(() => verifyQr(token.slice(0, -1) + (token.endsWith('A') ? 'B' : 'A'), SECRET, now), /không hợp lệ/);
   assert.throws(() => verifyQr(token, 'khoa-khac', now), /không hợp lệ/);
   assert.throws(() => verifyQr(undefined, SECRET, now), /không hợp lệ/);
