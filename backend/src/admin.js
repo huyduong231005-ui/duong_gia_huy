@@ -140,7 +140,11 @@ export function adminRouter() {
       req.params.id, { $addToSet: { students: req.body.studentId } }, { new: true },
     );
     if (!cls) throw new HttpError(404, 'Không tìm thấy lớp học phần');
-    // ponytail: SV ghi danh muộn chỉ có tên trong các buổi tạo sau đó
+    // Ghi danh muộn: thêm SV vào các buổi đang mở để quét QR được ngay (buổi đã đóng giữ nguyên)
+    await Session.updateMany(
+      { classSection: cls._id, open: true, 'records.student': { $ne: req.body.studentId } },
+      { $push: { records: { student: req.body.studentId } } },
+    );
     res.status(201).json(cls);
   });
 

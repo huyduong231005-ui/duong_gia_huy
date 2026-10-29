@@ -112,7 +112,8 @@ test('SV đã đăng ký mặt thì bắt buộc quét mặt đúng người', a
   assert.equal((await call(sv1, 'GET', '/me/spot-check')).body.requireFace, true);
   assert.match((await call(sv1, 'POST', '/spot-checks/respond', { sessionId, ...CLASSROOM })).body.message, /quét khuôn mặt/);
   const wrong = await call(sv1, 'POST', '/spot-checks/respond', { sessionId, ...CLASSROOM, embeddings: [unit(1)] });
-  assert.equal(wrong.status, 401);
+  assert.equal(wrong.status, 400, 'không dùng 401 để app không tưởng hết phiên');
+  assert.match(wrong.body.message, /không khớp/);
   const right = await call(sv1, 'POST', '/spot-checks/respond', { sessionId, ...CLASSROOM, embeddings: [unit(0)] });
   assert.equal(right.status, 200);
   assert.equal(await statusOf(sv1), 'present');

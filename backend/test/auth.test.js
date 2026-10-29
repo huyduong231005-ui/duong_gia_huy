@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { createApp } from '../src/app.js';
-import { User } from '../src/models.js';
+import { User, Otp } from '../src/models.js';
 
 const sentCodes = []; // [{ to, code, purpose }]
 let mongo, server, base;
@@ -81,8 +81,15 @@ test('đăng ký kiểm tra dữ liệu và chặn trùng', async () => {
   assert.equal((await call('POST', '/auth/register', { ...NEW_USER, email: 'khac@gmail.com' })).status, 409);
 });
 
-test('chưa xác minh thì đăng ký lại được để nhận mã mới', async () => {
+test('chưa xác minh thì đăng ký lại được để nhận mã mới, nhưng phải cách 30 giây', async () => {
   await call('POST', '/auth/register', NEW_USER);
+  const tooSoon = await call('POST', '/auth/register', NEW_USER);
+  assert.equal(tooSoon.status, 429);
+  assert.match(tooSoon.body.message, /đợi \d+ giây/);
+  assert.equal(sentCodes.length, 1);
+
+  // Giả lập đã qua 31 giây kể từ lúc gửi mã
+  await Otp.updateOne({}, { $set: { expiresAt: new Date(Date.now() + 5 * 60 * 1000 - 31_000) } });
   const again = await call('POST', '/auth/register', NEW_USER);
   assert.equal(again.status, 201);
   assert.equal(sentCodes.length, 2);

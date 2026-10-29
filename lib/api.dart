@@ -67,6 +67,10 @@ class Api {
   final FlutterSecureStorage _storage;
   String? _token;
 
+  /// Gọi khi đang đăng nhập mà server trả 401 (token hết hạn / tài khoản bị khoá).
+  /// Ngoài /auth/*, backend chỉ trả 401 từ bước kiểm token nên không nhầm với lỗi nghiệp vụ.
+  void Function(String message)? onUnauthorized;
+
   // CRUD chung cho các màn hình: trả về JSON đã giải mã (Map, List hoặc null khi 204).
   Future<dynamic> get(String path, [Map<String, String>? query]) =>
       _send('GET', path, null, query);
@@ -101,8 +105,12 @@ class Api {
       data = null;
     }
     if (res.statusCode >= 400) {
-      final message = data is Map ? data['message'] as String? : null;
-      throw ApiException(message ?? 'Lỗi máy chủ (${res.statusCode})', res.statusCode);
+      final message = (data is Map ? data['message'] as String? : null) ?? 'Lỗi máy chủ (${res.statusCode})';
+      // /me lúc mở app đã có restoreSession xử lý riêng
+      if (res.statusCode == 401 && _token != null && !path.startsWith('/auth') && path != '/me') {
+        onUnauthorized?.call(message);
+      }
+      throw ApiException(message, res.statusCode);
     }
     return data;
   }

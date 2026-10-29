@@ -55,6 +55,25 @@ void main() {
     expect(await const FlutterSecureStorage().read(key: 'token'), isNull);
   });
 
+  test('đang đăng nhập mà API trả 401 thì báo hết phiên; 401 ở /auth (sai mật khẩu…) thì không', () async {
+    final client = MockClient((req) async => switch (req.url.path) {
+          '/auth/login/verify' => _json({'token': 'abc', 'user': _user}, 200),
+          '/auth/face' => _json({'message': 'Khuôn mặt không khớp'}, 401),
+          _ => _json({'message': 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn'}, 401),
+        });
+    final expired = <String>[];
+    final a = Api(client: client)..onUnauthorized = expired.add;
+
+    await expectLater(a.get('/classes'), throwsA(isA<ApiException>()));
+    expect(expired, isEmpty, reason: 'chưa đăng nhập thì không có phiên nào để hết');
+
+    await a.verifyLogin('huy', '123456');
+    await expectLater(a.post('/auth/face', {}), throwsA(isA<ApiException>()));
+    expect(expired, isEmpty);
+    await expectLater(a.get('/classes'), throwsA(isA<ApiException>()));
+    expect(expired, ['Phiên đăng nhập không hợp lệ hoặc đã hết hạn']);
+  });
+
   test('điều hướng đúng trang theo vai trò', () {
     AppUser as(String role) => AppUser.fromJson({..._user, 'role': role});
     expect(homeFor(as('admin')).runtimeType.toString(), 'AdminHome');

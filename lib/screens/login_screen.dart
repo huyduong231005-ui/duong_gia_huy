@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-
 import '../api.dart';
+import '../google_auth.dart';
 import '../main.dart';
 import 'auth_widgets.dart';
 import 'face_scan_screen.dart';
@@ -71,20 +70,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loginWithGoogle() => _run(() async {
-        if (googleServerClientId.isEmpty) {
-          throw ApiException('Chưa cấu hình GOOGLE_SERVER_CLIENT_ID khi build app');
-        }
-        final google = GoogleSignIn.instance;
-        await google.initialize(serverClientId: googleServerClientId);
-        final GoogleSignInAccount account;
-        try {
-          account = await google.authenticate();
-        } on GoogleSignInException catch (e) {
-          if (e.code == GoogleSignInExceptionCode.canceled) return;
-          throw ApiException('Đăng nhập Google lỗi: ${e.description ?? e.code.name}');
-        }
-        final idToken = account.authentication.idToken;
-        if (idToken == null) throw ApiException('Google không trả về idToken');
+        final idToken = await googleIdToken();
+        if (idToken == null) return; // huỷ chọn tài khoản
         final user = await api.loginWithGoogle(idToken);
         if (mounted) goHome(context, user);
       });

@@ -19,21 +19,38 @@ class SpotCheckWatcher extends StatefulWidget {
   State<SpotCheckWatcher> createState() => _SpotCheckWatcherState();
 }
 
-class _SpotCheckWatcherState extends State<SpotCheckWatcher> {
+class _SpotCheckWatcherState extends State<SpotCheckWatcher> with WidgetsBindingObserver {
   Timer? _timer;
   bool _showing = false;
 
   @override
   void initState() {
     super.initState();
-    _check();
-    _timer = Timer.periodic(_pollEvery, (_) => _check());
+    WidgetsBinding.instance.addObserver(this);
+    _startPolling();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
+  }
+
+  // Không hỏi khi app ở nền (đỡ tốn pin, mạng); quay lại app thì hỏi ngay.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+    } else if (state == AppLifecycleState.paused) {
+      _timer?.cancel();
+    }
+  }
+
+  void _startPolling() {
+    _timer?.cancel();
+    _check();
+    _timer = Timer.periodic(_pollEvery, (_) => _check());
   }
 
   Future<void> _check() async {

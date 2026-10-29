@@ -8,7 +8,7 @@ import 'face_scan_screen.dart';
 import 'attendance_history_screen.dart';
 import 'class_screens.dart';
 import 'leaves_screen.dart';
-import 'login_screen.dart';
+import '../main.dart' show logout;
 import 'qr_screens.dart';
 import 'spot_check_screen.dart';
 
@@ -148,13 +148,6 @@ class _RoleHome extends StatelessWidget {
   final IconData icon;
   final List<HomeItem> items;
 
-  Future<void> _logout(BuildContext context) async {
-    await api.logout();
-    if (!context.mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
-  }
-
   void _open(BuildContext context, HomeItem item) {
     final (_, label, open) = item;
     if (open == null) {
@@ -174,7 +167,7 @@ class _RoleHome extends StatelessWidget {
           IconButton(
             tooltip: 'Đăng xuất',
             icon: const Icon(Icons.logout),
-            onPressed: () => _logout(context),
+            onPressed: logout,
           ),
         ],
       ),

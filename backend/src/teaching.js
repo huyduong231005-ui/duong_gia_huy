@@ -7,6 +7,7 @@ import { pick } from './admin.js';
 import { QR_WINDOW_MS, qrToken, qrWindow, verifyQr, checkLocation } from './checkin.js';
 
 const ABSENCE_LIMIT = 0.2; // vắng quá 20% số buổi thì bị cấm thi
+const LATE_AFTER_MS = 15 * 60 * 1000; // quét QR sau 15 phút kể từ lúc mở buổi thì ghi "đi muộn"
 const USER_FIELDS = 'username fullName email';
 
 const scopeOf = (user) =>
@@ -124,11 +125,13 @@ export function teachingRouter({ qrSecret }) {
       throw new HttpError(409, 'Bạn đã điểm danh buổi này rồi');
     }
     const { lat, lng, distance } = checkLocation(session, req.body);
-    Object.assign(record, { status: 'present', checkedAt: new Date(), lat, lng, distance });
+    const now = new Date();
+    const status = now - session.createdAt > LATE_AFTER_MS ? 'late' : 'present';
+    Object.assign(record, { status, checkedAt: now, lat, lng, distance });
     await session.save();
     await session.populate({ path: 'classSection', select: 'code subject', populate: { path: 'subject', select: 'name' } });
     res.json({
-      status: 'present',
+      status,
       distance,
       date: session.date,
       classCode: session.classSection.code,

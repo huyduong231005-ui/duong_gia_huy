@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { createApp } from '../src/app.js';
-import { User } from '../src/models.js';
+import { User, Session } from '../src/models.js';
 import { signToken } from '../src/auth.js';
 import { qrToken, qrWindow, verifyQr, distanceM, QR_WINDOW_MS } from '../src/checkin.js';
 
@@ -86,6 +86,24 @@ test('SV quét QR đúng chỗ → có mặt, GV thấy vị trí trên bản đ
   assert.equal(session.records[0].lat, 10.8507);
 
   assert.equal((await call(student, 'POST', '/checkin', { token: await qr(), ...CLASSROOM })).status, 409);
+});
+
+test('quét QR sau 15 phút kể từ lúc mở buổi thì ghi "đi muộn"', async () => {
+  // Giả lập buổi đã mở được 20 phút (sửa thẳng createdAt, Mongoose không cho đổi qua model)
+  await Session.collection.updateOne(
+    { _id: new mongoose.Types.ObjectId(sessionId) },
+    { $set: { createdAt: new Date(Date.now() - 20 * 60 * 1000) } },
+  );
+  const res = await call(student, 'POST', '/checkin', { token: await qr(), ...CLASSROOM });
+  assert.equal(res.body.status, 'late');
+  assert.equal((await call(lecturer, 'GET', `/sessions/${sessionId}`)).body.records[0].status, 'late');
+});
+
+test('SV ghi danh sau khi buổi đã mở vẫn quét QR được', async () => {
+  const sessions = (await call(lecturer, 'GET', '/classes')).body;
+  await call(admin, 'POST', `/admin/classes/${sessions[0].id}/students`, { studentId: outsider.id });
+  const res = await call(outsider, 'POST', '/checkin', { token: await qr(), ...CLASSROOM });
+  assert.equal(res.status, 200);
 });
 
 test('chặn: ở xa, fake GPS, thiếu vị trí, mã cũ, không có tên trong lớp, buổi đã đóng', async () => {

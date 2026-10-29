@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { User, Otp } from './models.js';
 
 const OTP_TTL_MS = 5 * 60 * 1000;
+const OTP_RESEND_MS = 30 * 1000; // chống spam email / đốt hạn mức 300 mail/ngày của Brevo
 const OTP_MAX_ATTEMPTS = 5;
 const TOKEN_TTL = '7d';
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,6 +50,9 @@ export function authRouter({ sendMail, verifyGoogle, jwtSecret }) {
   const session = (user) => ({ token: signToken(user, jwtSecret), user });
 
   async function issueOtp(user, purpose) {
+    const last = await Otp.findOne({ userId: user._id, purpose });
+    const waitMs = last ? last.expiresAt - OTP_TTL_MS + OTP_RESEND_MS - Date.now() : 0; // mã cũ tạo lúc expiresAt - TTL
+    if (waitMs > 0) throw new HttpError(429, `Vui lòng đợi ${Math.ceil(waitMs / 1000)} giây rồi gửi lại mã`);
     const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
     await Otp.findOneAndUpdate(
       { userId: user._id, purpose },

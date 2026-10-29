@@ -1,10 +1,34 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'google_auth.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
-void main() => runApp(const DiemDanhApp());
+void main() {
+  api.onUnauthorized = (message) => logout(message: message);
+  runApp(const DiemDanhApp());
+}
+
+final navigatorKey = GlobalKey<NavigatorState>();
+final messengerKey = GlobalKey<ScaffoldMessengerState>();
+bool _loggingOut = false;
+
+/// Đăng xuất (cả Google) và về màn đăng nhập từ bất kỳ đâu; [message] là lý do hiện cho người dùng.
+/// Nhiều request cùng gặp 401 một lúc thì chỉ chạy 1 lần.
+Future<void> logout({String? message}) async {
+  if (_loggingOut) return;
+  _loggingOut = true;
+  try {
+    await api.logout();
+    await googleSignOut();
+    navigatorKey.currentState
+        ?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
+    if (message != null) messengerKey.currentState?.showSnackBar(SnackBar(content: Text(message)));
+  } finally {
+    _loggingOut = false;
+  }
+}
 
 const _seed = Color(0xFF0F766E); // xanh mòng két
 
@@ -46,6 +70,8 @@ class DiemDanhApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+        navigatorKey: navigatorKey,
+        scaffoldMessengerKey: messengerKey,
         title: 'Điểm danh SV',
         debugShowCheckedModeBanner: false,
         theme: _theme(Brightness.light),

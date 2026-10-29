@@ -94,7 +94,8 @@ export function spotCheckRouter({ jwtSecret }) {
         throw new HttpError(400, 'Cần quét khuôn mặt để xác minh');
       }
       if (Math.min(...samples.map((s) => euclidean(me.faceEmbedding, s))) > FACE_THRESHOLD) {
-        throw new HttpError(401, 'Khuôn mặt không khớp, hãy quét lại');
+        // 400 chứ không 401: app coi 401 (ngoài /auth) là hết phiên và tự đăng xuất
+        throw new HttpError(400, 'Khuôn mặt không khớp, hãy quét lại');
       }
     }
 

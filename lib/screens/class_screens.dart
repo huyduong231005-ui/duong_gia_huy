@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -130,16 +132,25 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> with ApiListState
       });
 
   Future<void> _openSession() async {
-    final saved = await showFormSheet(
+    Json? created;
+    await showFormSheet(
       context,
       title: 'Mở buổi điểm danh',
       fields: [
         FieldSpec('date', 'Ngày học', kind: FieldKind.date, initial: today()),
         const FieldSpec('topic', 'Nội dung buổi học', required: false),
       ],
-      onSubmit: (v) => api.post('$_base/sessions', v),
+      onSubmit: (v) async => created = await api.post('$_base/sessions', v) as Json,
     );
-    if (saved) reload();
+    final id = created?['id'] as String?;
+    if (id == null || !mounted) return;
+    reload();
+    // Mở buổi xong vào thẳng màn chiếu QR; đóng QR thì về màn điểm danh của buổi đó
+    final nav = Navigator.of(context);
+    final sessionClosed = nav.push(MaterialPageRoute(builder: (_) => SessionScreen(sessionId: id)));
+    await nav.push(MaterialPageRoute(builder: (_) => QrDisplayScreen(sessionId: id)));
+    await sessionClosed;
+    if (mounted) reload();
   }
 
   Future<void> _addStudent(List enrolled) async {
@@ -353,11 +364,36 @@ class SessionScreen extends StatefulWidget {
 }
 
 class _SessionScreenState extends State<SessionScreen> {
+  static const _autoRefresh = Duration(seconds: 5);
+
   late Future<Json> _session = _load();
+  Timer? _timer;
+  bool _spotRunning = false;
 
   String get _path => '/sessions/${widget.sessionId}';
 
-  Future<Json> _load() async => await api.get(_path) as Json;
+  @override
+  void initState() {
+    super.initState();
+    // Đang có lượt kiểm tra đột xuất thì tự cập nhật ai đã xác minh, không cần kéo tay
+    _timer = Timer.periodic(_autoRefresh, (_) {
+      if (_spotRunning) _reload();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<Json> _load() async {
+    final s = await api.get(_path) as Json;
+    final checks = (s['spotChecks'] as List?) ?? const [];
+    _spotRunning = checks.isNotEmpty &&
+        DateTime.parse((checks.last as Json)['expiresAt'] as String).isAfter(DateTime.now());
+    return s;
+  }
 
   Future<void> _reload() async {
     final next = _load();
