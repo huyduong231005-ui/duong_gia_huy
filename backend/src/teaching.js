@@ -5,6 +5,7 @@ import { ClassSection, Session, LeaveRequest, ATTENDANCE } from './models.js';
 import { HttpError, str } from './auth.js';
 import { pick } from './admin.js';
 import { QR_WINDOW_MS, qrToken, qrWindow, verifyQr, checkLocation } from './checkin.js';
+import { vnNow, meetingsOn, currentMeeting, isMakeup, toMinutes } from './schedule.js';
 
 const ABSENCE_LIMIT = 0.2; // vắng quá 20% số buổi thì bị cấm thi
 const LATE_AFTER_MS = 15 * 60 * 1000; // quét QR sau 15 phút kể từ lúc mở buổi thì ghi "đi muộn"
@@ -67,20 +68,49 @@ export function teachingRouter({ qrSecret }) {
     if (isTeacher(req.user)) return res.json(sessions);
     // Sinh viên chỉ thấy trạng thái của chính mình
     res.json(sessions.map((s) => ({
-      id: s.id, date: s.date, topic: s.topic, open: s.open, myStatus: statusOf(s, req.user._id),
+      id: s.id, date: s.date, topic: s.topic, open: s.open, makeup: s.makeup, myStatus: statusOf(s, req.user._id),
     })));
+  });
+
+  // ---- Hôm nay: các lớp có lịch học hôm nay theo TKB (giờ Việt Nam) ----
+  r.get('/me/today', async (req, res) => {
+    const today = vnNow();
+    const classes = await ClassSection.find({ ...scopeOf(req.user), 'meetings.weekday': today.weekday })
+      .populate('subject', 'code name')
+      .populate('lecturer', USER_FIELDS);
+    const active = classes.filter((c) => meetingsOn(c).length > 0);
+    const sessions = await Session.find({ classSection: { $in: active.map((c) => c._id) }, date: today.date })
+      .sort({ createdAt: -1 });
+
+    const rows = active.map((c) => {
+      const s = sessions.find((x) => x.classSection.equals(c._id)); // buổi mới nhất hôm nay
+      return {
+        classSection: { id: c.id, code: c.code, subject: c.subject?.name ?? '', lecturer: c.lecturer },
+        meetings: meetingsOn(c),
+        inProgress: Boolean(currentMeeting(c)),
+        session: s && {
+          id: s.id,
+          open: s.open,
+          makeup: s.makeup,
+          ...(isTeacher(req.user) ? {} : { myStatus: statusOf(s, req.user._id) }),
+        },
+      };
+    });
+    rows.sort((a, b) => toMinutes(a.meetings[0].start) - toMinutes(b.meetings[0].start));
+    res.json({ date: today.date, weekday: today.weekday, classes: rows });
   });
 
   r.post('/classes/:id/sessions', async (req, res) => {
     requireTeacher(req.user);
     const cls = await findClass(req.params.id, req.user);
-    const date = str(req.body?.date);
+    const date = str(req.body?.date) || vnNow().date;
     // SV đã có đơn nghỉ được duyệt cho ngày này thì vào sẵn "có phép"
     const excused = await LeaveRequest.find({ classSection: cls._id, date, status: 'approved' }).distinct('student');
     const session = await Session.create({
       classSection: cls._id,
       date,
       topic: str(req.body?.topic),
+      makeup: isMakeup(cls, date),
       records: cls.students.map((student) => ({
         student,
         status: excused.some((id) => id.equals(student)) ? 'excused' : 'absent',

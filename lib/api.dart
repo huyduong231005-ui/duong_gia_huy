@@ -78,14 +78,21 @@ class Api {
   Future<dynamic> patch(String path, Map<String, dynamic> body) => _send('PATCH', path, body);
   Future<dynamic> delete(String path) => _send('DELETE', path);
 
+  /// Gửi nguyên file (VD: Excel) dạng nhị phân.
+  Future<dynamic> upload(String path, List<int> bytes) => _send('POST', path, null, null, bytes);
+
   Future<dynamic> _send(String method, String path,
-      [Map<String, dynamic>? body, Map<String, String>? query]) async {
+      [Map<String, dynamic>? body, Map<String, String>? query, List<int>? bytes]) async {
     var uri = Uri.parse('$apiUrl$path');
     if (query != null) uri = uri.replace(queryParameters: query);
     final req = http.Request(method, uri)
       ..headers['content-type'] = 'application/json';
     if (_token != null) req.headers['authorization'] = 'Bearer $_token';
     if (body != null) req.body = jsonEncode(body);
+    if (bytes != null) {
+      req.headers['content-type'] = 'application/octet-stream';
+      req.bodyBytes = bytes;
+    }
 
     final http.Response res;
     try {

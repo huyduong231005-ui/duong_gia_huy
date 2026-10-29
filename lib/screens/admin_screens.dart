@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -146,6 +147,108 @@ class _UsersScreenState extends State<UsersScreen> with ApiListState {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// ---------------- Nhập Excel: thời khoá biểu + danh sách SV ----------------
+
+class ImportScreen extends StatefulWidget {
+  const ImportScreen({super.key});
+
+  @override
+  State<ImportScreen> createState() => _ImportScreenState();
+}
+
+class _ImportScreenState extends State<ImportScreen> {
+  static const sampleUrl = '$apiUrl/mau-import.xlsx';
+
+  bool _busy = false;
+  String? _fileName;
+  Json? _result;
+  String? _error;
+
+  Future<void> _pickAndImport() async {
+    final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['xlsx']);
+    if (files.isEmpty || !mounted) return;
+    setState(() {
+      _busy = true;
+      _fileName = files.first.name;
+      _result = null;
+      _error = null;
+    });
+    try {
+      final bytes = await files.first.readAsBytes();
+      final result = await api.upload('/admin/import', bytes) as Json;
+      if (mounted) setState(() => _result = result);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final r = _result;
+    final errors = ((r?['errors'] as List?) ?? const []).cast<String>();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Nhập Excel')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text('File .xlsx gồm 2 sheet:', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          const Text('• ThoiKhoaBieu: Mã lớp, Mã môn, Tên môn, Email GV, Tên GV, Thứ, Giờ bắt đầu, '
+              'Giờ kết thúc, Phòng, Từ ngày, Đến ngày (mỗi dòng 1 buổi/tuần).'),
+          const Text('• SinhVien: Mã lớp, MSSV, Họ tên, Email.'),
+          const SizedBox(height: 6),
+          const Text('Tài khoản mới: tên đăng nhập = MSSV (GV: phần trước @ của email), '
+              'mật khẩu mặc định = tên đăng nhập. Nhập lại cùng file không tạo trùng.'),
+          const SizedBox(height: 12),
+          Card.outlined(
+            child: ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('File mẫu (20 SV, lớp demo học cả ngày)'),
+              subtitle: const SelectableText(sampleUrl),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _busy ? null : _pickAndImport,
+            icon: _busy
+                ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
+                : const Icon(Icons.upload_file),
+            label: Text(_busy ? 'Đang nhập $_fileName…' : 'Chọn file Excel (.xlsx)'),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            Text(_error!, style: TextStyle(color: scheme.error)),
+          ],
+          if (r != null) ...[
+            const SizedBox(height: 16),
+            Card(
+              color: scheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Đã nhập $_fileName', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Text('${r['subjects']} môn · ${r['lecturers']} giảng viên · ${r['classes']} lớp học phần'),
+                  Text('${r['students']} sinh viên · ${r['enrollments']} lượt ghi danh'),
+                  Text('${r['newAccounts']} tài khoản mới được tạo'),
+                ]),
+              ),
+            ),
+            if (errors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('${errors.length} dòng bị bỏ qua:', style: TextStyle(color: scheme.error, fontWeight: FontWeight.w600)),
+              for (final e in errors) Text('• $e'),
+            ],
+          ],
+        ],
       ),
     );
   }

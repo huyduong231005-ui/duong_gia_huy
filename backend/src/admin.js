@@ -1,10 +1,12 @@
 // API chỉ dành cho admin: tài khoản, môn học, lớp học phần, ghi danh. Gắn ở /admin.
-import { Router } from 'express';
+import express, { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { User, Subject, ClassSection, Session, LeaveRequest, ROLES } from './models.js';
 import { HttpError, str, EMAIL_RE, USERNAME_RE, MIN_PASSWORD } from './auth.js';
+import { importWorkbook, enrollStudent } from './importer.js';
 
 const LIST_LIMIT = 200; // ponytail: chưa phân trang, đủ cho quy mô 1 khoa; thêm skip/limit khi vượt
+const IMPORT_LIMIT = '5mb';
 
 export const like = (q) => new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
@@ -101,7 +103,9 @@ export function adminRouter() {
   });
 
   // ---- Lớp học phần (xem danh sách lớp ở GET /classes, dùng chung mọi vai trò) ----
-  const CLASS_FIELDS = ['code', 'subject', 'lecturer', 'room', 'schedule', 'semester', 'plannedSessions'];
+  const CLASS_FIELDS = [
+    'code', 'subject', 'lecturer', 'room', 'schedule', 'semester', 'plannedSessions', 'meetings', 'startDate', 'endDate',
+  ];
 
   async function checkClassRefs(body) {
     if (body.subject !== undefined) await mustExist(Subject, body.subject, {}, 'Môn học không tồn tại');
@@ -136,16 +140,15 @@ export function adminRouter() {
   // ---- Ghi danh sinh viên ----
   r.post('/classes/:id/students', async (req, res) => {
     await mustExist(User, req.body?.studentId, { role: 'student' }, 'Sinh viên không tồn tại');
-    const cls = await ClassSection.findByIdAndUpdate(
-      req.params.id, { $addToSet: { students: req.body.studentId } }, { new: true },
-    );
+    const cls = await enrollStudent(req.params.id, req.body.studentId);
     if (!cls) throw new HttpError(404, 'Không tìm thấy lớp học phần');
-    // Ghi danh muộn: thêm SV vào các buổi đang mở để quét QR được ngay (buổi đã đóng giữ nguyên)
-    await Session.updateMany(
-      { classSection: cls._id, open: true, 'records.student': { $ne: req.body.studentId } },
-      { $push: { records: { student: req.body.studentId } } },
-    );
     res.status(201).json(cls);
+  });
+
+  // ---- Nhập Excel: thời khoá biểu + danh sách SV (app gửi nguyên file dạng nhị phân) ----
+  r.post('/import', express.raw({ type: '*/*', limit: IMPORT_LIMIT }), async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Chưa có file Excel');
+    res.json(await importWorkbook(req.body));
   });
 
   r.delete('/classes/:id/students/:studentId', async (req, res) => {

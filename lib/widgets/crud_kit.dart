@@ -26,6 +26,21 @@ const _statusColors = {
   'left': Colors.purple,
 };
 
+const weekdayLabels = {1: 'Thứ 2', 2: 'Thứ 3', 3: 'Thứ 4', 4: 'Thứ 5', 5: 'Thứ 6', 6: 'Thứ 7', 7: 'Chủ nhật'};
+
+/// 1 buổi trong thời khoá biểu: "Thứ 2 · 07:30–09:45 · A2.03".
+String meetingText(dynamic m, {bool withDay = true}) => [
+      if (withDay) weekdayLabels[m['weekday']] ?? '',
+      '${m['start']}–${m['end']}',
+      if ((m['room'] as String? ?? '').isNotEmpty) 'Phòng ${m['room']}',
+    ].join(' · ');
+
+/// "2026-09-01" → "01/09/2026".
+String viDate(String? iso) {
+  if (iso == null || iso.length != 10) return iso ?? '';
+  return '${iso.substring(8)}/${iso.substring(5, 7)}/${iso.substring(0, 4)}';
+}
+
 /// Ngày hôm nay dạng YYYY-MM-DD (giờ máy).
 String today() => DateTime.now().toIso8601String().substring(0, 10);
 

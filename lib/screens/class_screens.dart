@@ -9,6 +9,20 @@ import 'qr_screens.dart';
 
 bool _isTeacher(AppUser u) => u.role == 'lecturer' || u.role == 'admin';
 
+/// Vào thẳng màn chiếu QR của buổi; đóng QR thì về màn điểm danh của buổi đó.
+/// Xong (future hoàn tất) khi rời màn buổi học.
+Future<void> showSessionWithQr(BuildContext context, String sessionId) async {
+  final nav = Navigator.of(context);
+  final sessionClosed = nav.push(MaterialPageRoute(builder: (_) => SessionScreen(sessionId: sessionId)));
+  await nav.push(MaterialPageRoute(builder: (_) => QrDisplayScreen(sessionId: sessionId)));
+  await sessionClosed;
+}
+
+/// Tóm tắt TKB cho danh sách lớp: "Thứ 2 07:30, Thứ 5 13:00" hoặc "7 buổi/tuần".
+String _meetingsSummary(List meetings) => meetings.length > 3
+    ? '${meetings.length} buổi/tuần'
+    : meetings.map((m) => '${weekdayLabels[m['weekday']]} ${m['start']}').join(', ');
+
 // ---------------- Danh sách lớp (mọi vai trò, backend tự lọc) ----------------
 
 class ClassesScreen extends StatefulWidget {
@@ -89,7 +103,10 @@ class _ClassesScreenState extends State<ClassesScreen> with ApiListState {
               subtitle: Text([
                 'GV: ${nameOf(c['lecturer'])}',
                 if ((c['room'] as String).isNotEmpty) 'Phòng ${c['room']}',
-                if ((c['schedule'] as String).isNotEmpty) c['schedule'],
+                if ((c['meetings'] as List? ?? const []).isNotEmpty)
+                  _meetingsSummary(c['meetings'] as List)
+                else if ((c['schedule'] as String).isNotEmpty)
+                  c['schedule'],
                 '${(c['students'] as List).length} sinh viên',
               ].join(' · ')),
               onTap: () async {
@@ -144,12 +161,9 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> with ApiListState
     );
     final id = created?['id'] as String?;
     if (id == null || !mounted) return;
+    if (created?['makeup'] == true) showError(context, 'Ngoài giờ trong thời khoá biểu → ghi là buổi bù');
     reload();
-    // Mở buổi xong vào thẳng màn chiếu QR; đóng QR thì về màn điểm danh của buổi đó
-    final nav = Navigator.of(context);
-    final sessionClosed = nav.push(MaterialPageRoute(builder: (_) => SessionScreen(sessionId: id)));
-    await nav.push(MaterialPageRoute(builder: (_) => QrDisplayScreen(sessionId: id)));
-    await sessionClosed;
+    await showSessionWithQr(context, id);
     if (mounted) reload();
   }
 
@@ -190,8 +204,12 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> with ApiListState
     return Card(
       child: ListTile(
         leading: Icon(s['open'] == true ? Icons.lock_open : Icons.lock_outline),
-        title: Text(s['date'] + ((s['topic'] as String).isEmpty ? '' : ' · ${s['topic']}')),
-        subtitle: teacher ? Text('Có mặt $here/${records.length} · ${s['open'] == true ? 'Đang mở' : 'Đã đóng'}') : null,
+        title: Text(viDate(s['date']) + ((s['topic'] as String? ?? '').isEmpty ? '' : ' · ${s['topic']}')),
+        subtitle: Text([
+          if (teacher) 'Có mặt $here/${records.length}',
+          if (teacher) s['open'] == true ? 'Đang mở' : 'Đã đóng',
+          if (s['makeup'] == true) 'Buổi bù',
+        ].join(' · ')),
         trailing: teacher
             ? EditDeleteMenu(onEdit: null, onDelete: () => _deleteSession(s))
             : StatusChip(s['myStatus'] as String?),
@@ -294,6 +312,12 @@ class _ClassHeader extends StatelessWidget {
                 Text('Giảng viên: ${nameOf(cls['lecturer'])}'),
                 if ((cls['room'] as String).isNotEmpty) Text('Phòng: ${cls['room']}'),
                 if ((cls['schedule'] as String).isNotEmpty) Text('Lịch: ${cls['schedule']}'),
+                if ((cls['meetings'] as List? ?? const []).isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text('Thời khoá biểu (${viDate(cls['startDate'])} – ${viDate(cls['endDate'])}):',
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  for (final m in cls['meetings'] as List) Text('• ${meetingText(m)}'),
+                ],
                 if ((cls['semester'] as String).isNotEmpty) Text('Học kỳ: ${cls['semester']}'),
                 Text('Số buổi dự kiến: ${cls['plannedSessions']}'),
               ]),

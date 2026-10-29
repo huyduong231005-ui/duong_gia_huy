@@ -43,6 +43,7 @@ export const Otp = mongoose.model('Otp', otpSchema);
 export const ATTENDANCE = ['present', 'late', 'absent', 'excused', 'left'];
 export const LEAVE_STATUS = ['pending', 'approved', 'rejected'];
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/; // ngày dạng YYYY-MM-DD, so khớp theo ngày cho đơn giản
+export const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/; // giờ dạng HH:mm
 
 const ref = (model) => ({ type: mongoose.Types.ObjectId, ref: model });
 const options = {
@@ -69,6 +70,20 @@ const classSchema = new mongoose.Schema(
     semester: { type: String, default: '', trim: true },
     plannedSessions: { type: Number, min: 1, max: 100, default: 15 }, // để tính số buổi được vắng (20%)
     students: [ref('User')],
+    // Thời khoá biểu: các buổi học trong tuần, áp dụng từ startDate đến endDate (giờ Việt Nam)
+    meetings: [
+      new mongoose.Schema(
+        {
+          weekday: { type: Number, min: 1, max: 7, required: true }, // 1 = Thứ 2 … 7 = Chủ nhật
+          start: { type: String, match: TIME_RE, required: true },
+          end: { type: String, match: TIME_RE, required: true },
+          room: { type: String, default: '', trim: true },
+        },
+        { _id: false },
+      ),
+    ],
+    startDate: { type: String, match: DATE_RE },
+    endDate: { type: String, match: DATE_RE },
   },
   options,
 );
@@ -108,6 +123,7 @@ const sessionSchema = new mongoose.Schema(
     date: { type: String, required: true, match: DATE_RE },
     topic: { type: String, default: '', trim: true },
     open: { type: Boolean, default: true },
+    makeup: { type: Boolean, default: false }, // buổi bù: mở ngoài giờ trong thời khoá biểu
     // Vị trí GV lúc chiếu QR; SV phải ở trong bán kính radius mét mới điểm danh được
     lat: { type: Number, min: -90, max: 90 },
     lng: { type: Number, min: -180, max: 180 },
