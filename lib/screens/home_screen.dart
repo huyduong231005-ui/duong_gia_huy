@@ -6,6 +6,7 @@ import 'attendance_history_screen.dart';
 import 'class_screens.dart';
 import 'leaves_screen.dart';
 import 'login_screen.dart';
+import 'qr_screens.dart';
 
 /// Ô chức năng trên trang chủ; [open] null = chưa làm (QR, thống kê… gắn ở bước sau).
 typedef HomeItem = (IconData icon, String label, Widget Function()? open);
@@ -42,7 +43,7 @@ class LecturerHome extends StatelessWidget {
         items: [
           (Icons.class_outlined, 'Lớp của tôi\n& điểm danh', () => ClassesScreen(me: user, title: 'Lớp của tôi')),
           (Icons.fact_check_outlined, 'Duyệt đơn nghỉ', () => LeavesScreen(me: user)),
-          (Icons.qr_code_2, 'Điểm danh QR', null),
+          (Icons.qr_code_2, 'Chiếu QR điểm danh', () => ClassesScreen(me: user, title: 'Chọn lớp để điểm danh')),
           (Icons.insights_outlined, 'Thống kê', null),
         ],
       );
@@ -62,7 +63,7 @@ class StudentHome extends StatelessWidget {
           (Icons.calendar_month_outlined, 'Lớp & lịch học', () => ClassesScreen(me: user, title: 'Lớp của tôi')),
           (Icons.history, 'Lịch sử chuyên cần', () => const AttendanceHistoryScreen()),
           (Icons.edit_note, 'Xin nghỉ phép', () => LeavesScreen(me: user)),
-          (Icons.qr_code_scanner, 'Quét QR điểm danh', null),
+          (Icons.qr_code_scanner, 'Quét QR điểm danh', () => const ScanCheckinScreen()),
         ],
       );
 }

@@ -20,7 +20,7 @@ export function createApp({ sendMail, verifyGoogle, jwtSecret }) {
   );
   app.get('/me', requireAuth(jwtSecret), (req, res) => res.json(req.user));
   app.use('/admin', requireAuth(jwtSecret, 'admin'), adminRouter());
-  app.use(requireAuth(jwtSecret), teachingRouter());
+  app.use(requireAuth(jwtSecret), teachingRouter({ qrSecret: jwtSecret }));
 
   app.use((_req, _res, next) => next(new HttpError(404, 'Không tìm thấy API')));
   // eslint-disable-next-line no-unused-vars

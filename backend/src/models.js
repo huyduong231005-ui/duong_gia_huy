@@ -73,6 +73,10 @@ const recordSchema = new mongoose.Schema(
     student: ref('User'),
     status: { type: String, enum: ATTENDANCE, default: 'absent' },
     checkedAt: Date,
+    // Vị trí SV gửi khi quét QR (chia sẻ vị trí cho GV xem trên bản đồ)
+    lat: Number,
+    lng: Number,
+    distance: Number, // mét tới vị trí GV
   },
   { _id: false },
 );
@@ -83,6 +87,10 @@ const sessionSchema = new mongoose.Schema(
     date: { type: String, required: true, match: DATE_RE },
     topic: { type: String, default: '', trim: true },
     open: { type: Boolean, default: true },
+    // Vị trí GV lúc chiếu QR; SV phải ở trong bán kính radius mét mới điểm danh được
+    lat: { type: Number, min: -90, max: 90 },
+    lng: { type: Number, min: -180, max: 180 },
+    radius: { type: Number, min: 10, max: 1000, default: 100 },
     records: [recordSchema],
   },
   options,

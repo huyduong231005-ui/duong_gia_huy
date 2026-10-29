@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../widgets/crud_kit.dart';
 import 'auth_widgets.dart';
+import 'qr_screens.dart';
 
 bool _isTeacher(AppUser u) => u.role == 'lecturer' || u.role == 'admin';
 
@@ -354,6 +355,21 @@ class _SessionScreenState extends State<SessionScreen> {
               title: Text(s == null ? 'Buổi học' : 'Buổi ${s['date']}'),
               actions: [
                 if (s != null) ...[
+                  IconButton(
+                    tooltip: 'Chiếu QR',
+                    icon: const Icon(Icons.qr_code_2),
+                    onPressed: () async {
+                      await Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => QrDisplayScreen(sessionId: widget.sessionId)));
+                      _reload();
+                    },
+                  ),
+                  IconButton(
+                    tooltip: 'Bản đồ vị trí',
+                    icon: const Icon(Icons.map_outlined),
+                    onPressed: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => SessionMapScreen(session: s))),
+                  ),
                   IconButton(tooltip: 'Sửa', icon: const Icon(Icons.edit_outlined), onPressed: () => _editTopic(s)),
                   IconButton(
                     tooltip: s['open'] == true ? 'Đóng buổi' : 'Mở lại buổi',
@@ -388,7 +404,10 @@ class _SessionScreenState extends State<SessionScreen> {
                               Card(
                                 child: ListTile(
                                   title: Text(nameOf(r['student'])),
-                                  subtitle: Text(r['student'] is Map ? '@${r['student']['username']}' : ''),
+                                  subtitle: Text([
+                                    if (r['student'] is Map) '@${r['student']['username']}',
+                                    if (r['distance'] != null) 'QR · cách ${r['distance']} m',
+                                  ].join(' · ')),
                                   trailing: PopupMenuButton<String>(
                                     tooltip: 'Đổi trạng thái',
                                     onSelected: (status) => _change(() =>

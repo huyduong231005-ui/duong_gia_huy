@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { ClassSection, Session, LeaveRequest, ATTENDANCE } from './models.js';
 import { HttpError, str } from './auth.js';
 import { pick } from './admin.js';
+import { QR_WINDOW_MS, qrToken, qrWindow, verifyQr, distanceM } from './checkin.js';
 
 const ABSENCE_LIMIT = 0.2; // vắng quá 20% số buổi thì bị cấm thi
 const USER_FIELDS = 'username fullName email';
@@ -36,7 +37,7 @@ async function findSession(id, user) {
 const statusOf = (session, studentId) =>
   session.records.find((r) => r.student?.equals(studentId))?.status ?? null;
 
-export function teachingRouter() {
+export function teachingRouter({ qrSecret }) {
   const r = Router();
 
   // ---- Lớp học phần ----
@@ -99,8 +100,51 @@ export function teachingRouter() {
   r.patch('/sessions/:id', async (req, res) => {
     requireTeacher(req.user);
     const session = await findSession(req.params.id, req.user);
-    session.set(pick(req.body, ['date', 'topic', 'open']));
+    session.set(pick(req.body, ['date', 'topic', 'open', 'lat', 'lng', 'radius']));
     res.json(await session.save());
+  });
+
+  // ---- QR động + check-in GPS ----
+  r.get('/sessions/:id/qr', async (req, res) => {
+    requireTeacher(req.user);
+    const session = await findSession(req.params.id, req.user);
+    if (!session.open) throw new HttpError(400, 'Buổi học đã đóng, hãy mở lại để chiếu QR');
+    const now = Date.now();
+    res.json({ token: qrToken(session.id, qrWindow(now), qrSecret), refreshInMs: QR_WINDOW_MS - (now % QR_WINDOW_MS) });
+  });
+
+  r.post('/checkin', async (req, res) => {
+    if (req.user.role !== 'student') throw new HttpError(403, 'Chỉ sinh viên mới quét QR điểm danh');
+    const session = await Session.findById(verifyQr(req.body?.token, qrSecret));
+    if (!session) throw new HttpError(404, 'Không tìm thấy buổi học');
+    if (!session.open) throw new HttpError(400, 'Buổi học đã đóng điểm danh');
+    const record = session.records.find((rec) => rec.student?.equals(req.user._id));
+    if (!record) throw new HttpError(403, 'Bạn không có tên trong lớp của buổi học này');
+    if (record.status === 'present' || record.status === 'late') {
+      throw new HttpError(409, 'Bạn đã điểm danh buổi này rồi');
+    }
+    if (req.body?.mocked === true) throw new HttpError(400, 'Phát hiện vị trí giả lập, hãy tắt ứng dụng fake GPS');
+    const lat = Number(req.body?.lat);
+    const lng = Number(req.body?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new HttpError(400, 'Thiếu vị trí GPS');
+
+    let distance = null;
+    if (session.lat != null && session.lng != null) {
+      distance = Math.round(distanceM(session.lat, session.lng, lat, lng));
+      if (distance > session.radius) {
+        throw new HttpError(400, `Bạn đang cách lớp khoảng ${distance} m (cho phép ${session.radius} m)`);
+      }
+    }
+    Object.assign(record, { status: 'present', checkedAt: new Date(), lat, lng, distance });
+    await session.save();
+    await session.populate({ path: 'classSection', select: 'code subject', populate: { path: 'subject', select: 'name' } });
+    res.json({
+      status: 'present',
+      distance,
+      date: session.date,
+      classCode: session.classSection.code,
+      subject: session.classSection.subject?.name ?? '',
+    });
   });
 
   r.delete('/sessions/:id', async (req, res) => {
