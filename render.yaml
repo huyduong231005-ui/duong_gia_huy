@@ -1,0 +1,22 @@
+# Render Blueprint: Render đọc file này khi tạo service từ repo GitHub.
+services:
+  - type: web
+    name: duong-gia-huy-api
+    runtime: node
+    plan: free
+    region: singapore # cùng vùng với MongoDB Atlas để truy vấn nhanh
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
