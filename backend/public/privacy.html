@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chính sách quyền riêng tư – Điểm danh SV</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f0fdfa; color: #134e4a; line-height: 1.6; }
+    main { max-width: 720px; margin: 0 auto; padding: 48px 16px; }
+    h1 { margin: 0 0 4px; }
+    h2 { margin-top: 28px; font-size: 1.15rem; }
+    a { color: #0f766e; }
+    li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Chính sách quyền riêng tư</h1>
+  <p>Ứng dụng <b>Điểm danh SV</b> (đồ án môn học, nhóm 4 con tuất) · Cập nhật: 29/10/2026</p>
+
+  <h2>1. Dữ liệu được thu thập</h2>
+  <ul>
+    <li><b>Tài khoản:</b> họ tên, tên đăng nhập, email, mật khẩu (chỉ lưu bản băm bcrypt, không lưu mật khẩu gốc).</li>
+    <li><b>Đăng nhập bằng Google:</b> chỉ nhận email, họ tên và mã định danh tài khoản Google; không truy cập dữ liệu khác trong tài khoản Google.</li>
+    <li><b>Khuôn mặt (tuỳ chọn):</b> chỉ lưu một vector 512 số được tính trên điện thoại; <b>không lưu và không gửi ảnh khuôn mặt</b>. Ảnh chụp tạm bị xoá ngay sau khi tính xong.</li>
+    <li><b>Vị trí:</b> toạ độ GPS chỉ được gửi tại thời điểm quét QR điểm danh hoặc xác minh khi bị kiểm tra đột xuất; ứng dụng không theo dõi vị trí ở chế độ nền.</li>
+    <li><b>Học tập:</b> lớp học phần, trạng thái điểm danh từng buổi, đơn xin nghỉ.</li>
+  </ul>
+
+  <h2>2. Mục đích sử dụng</h2>
+  <p>Chỉ để xác thực người dùng và quản lý điểm danh trong ứng dụng. Không dùng cho quảng cáo, không bán hay chia sẻ cho bên thứ ba.</p>
+
+  <h2>3. Nơi lưu trữ và bên xử lý</h2>
+  <ul>
+    <li>Cơ sở dữ liệu MongoDB Atlas (khu vực Singapore); máy chủ API chạy trên Render.</li>
+    <li>Email mã OTP được gửi qua dịch vụ Brevo.</li>
+    <li>Đăng nhập Google do Google xử lý theo chính sách của Google.</li>
+  </ul>
+
+  <h2>4. Ai được xem dữ liệu</h2>
+  <p>Sinh viên chỉ xem dữ liệu của chính mình; giảng viên xem dữ liệu điểm danh và vị trí điểm danh của sinh viên trong lớp mình dạy; quản trị viên quản lý tài khoản và lớp học. Vector khuôn mặt không bao giờ được trả về cho bất kỳ ai.</p>
+
+  <h2>5. Quyền của bạn</h2>
+  <p>Bạn có thể tắt đăng nhập bằng khuôn mặt (xoá vector) ngay trong ứng dụng. Để xoá toàn bộ tài khoản và dữ liệu, gửi email tới <a href="mailto:huyduong455@gmail.com">huyduong455@gmail.com</a>.</p>
+
+  <p><a href="/">← Trang chủ</a></p>
+</main>
+</body>
+</html>

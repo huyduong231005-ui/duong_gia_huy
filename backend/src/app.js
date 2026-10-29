@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { authRouter, requireAuth, HttpError } from './auth.js';
@@ -6,6 +7,7 @@ import { teachingRouter } from './teaching.js';
 import { faceRouter } from './face.js';
 import { spotCheckRouter } from './spotcheck.js';
 
+const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_REQUESTS = 100;
 
@@ -15,6 +17,8 @@ export function createApp({ sendMail, verifyGoogle, jwtSecret }) {
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
+  // Trang chủ + chính sách quyền riêng tư (Google đòi khi xuất bản màn hình đồng ý OAuth)
+  app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
   app.use(
     '/auth',
     rateLimit({ windowMs: AUTH_WINDOW_MS, limit: AUTH_MAX_REQUESTS }),

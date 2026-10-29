@@ -144,6 +144,15 @@ test('/me cần token hợp lệ', async () => {
   assert.equal((await call('GET', '/me', null, body.token)).status, 401);
 });
 
+test('trang chủ và chính sách quyền riêng tư công khai, không cần đăng nhập', async () => {
+  for (const path of ['/', '/privacy']) {
+    const res = await fetch(base + path);
+    assert.equal(res.status, 200, path);
+    assert.match(res.headers.get('content-type'), /text\/html/);
+  }
+  assert.match(await (await fetch(`${base}/privacy`)).text(), /Chính sách quyền riêng tư/);
+});
+
 test('JSON hỏng và API lạ trả lỗi gọn', async () => {
   const bad = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{' });
   assert.equal(bad.status, 400);
