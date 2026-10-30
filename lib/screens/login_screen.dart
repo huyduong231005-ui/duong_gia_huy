@@ -26,22 +26,25 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _username.addListener(_refreshFingerprint); // đổi tài khoản trong ô thì hiện/ẩn vân tay theo
     _loadQuickLogin();
   }
 
   /// Điền sẵn tài khoản lần trước để bấm khuôn mặt / vân tay là vào luôn.
   Future<void> _loadQuickLogin() async {
     final last = await QuickLogin.lastUsername();
-    final fingerprint = await QuickLogin.fingerprintEnabled();
-    if (!mounted) return;
-    setState(() {
-      if (_username.text.isEmpty && last != null) _username.text = last;
-      _fingerprint = fingerprint;
-    });
+    if (mounted && _username.text.isEmpty && last != null) _username.text = last;
+  }
+
+  /// Vân tay lưu riêng từng tài khoản: chỉ hiện biểu tượng khi tài khoản trong ô đã tự bật.
+  Future<void> _refreshFingerprint() async {
+    final name = _username.text;
+    final enabled = name.trim().isNotEmpty && await QuickLogin.fingerprintEnabled(name);
+    if (mounted && name == _username.text && enabled != _fingerprint) setState(() => _fingerprint = enabled);
   }
 
   Future<void> _loginWithFingerprint() => _run(() async {
-        final user = await QuickLogin.loginWithFingerprint();
+        final user = await QuickLogin.loginWithFingerprint(_username.text);
         if (user != null && mounted) goHome(context, user);
       });
 

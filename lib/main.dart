@@ -23,10 +23,10 @@ Future<void> logout({String? message}) async {
   if (_loggingOut) return;
   _loggingOut = true;
   try {
+    // Bị đăng xuất bắt buộc (hết phiên / bị khoá) thì phiên vân tay dùng token đó cũng bỏ
+    if (message != null) await QuickLogin.forgetToken(api.token);
     await api.logout();
     await googleSignOut();
-    // Bị đăng xuất bắt buộc (hết phiên / bị khoá) thì phiên lưu cho vân tay cũng không dùng được nữa
-    if (message != null) await QuickLogin.disableFingerprint();
     navigatorKey.currentState
         ?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
     if (message != null) messengerKey.currentState?.showSnackBar(SnackBar(content: Text(message)));

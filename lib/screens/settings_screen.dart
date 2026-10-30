@@ -26,7 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    QuickLogin.fingerprintEnabled().then((v) {
+    QuickLogin.fingerprintEnabled(widget.user.username).then((v) {
       if (mounted) setState(() => _fingerprint = v);
     });
   }
@@ -86,9 +86,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _toggleFingerprint(bool on) => _busyWhile(() async {
         if (on) {
-          if (!await QuickLogin.enableFingerprint()) return; // huỷ quét
+          if (!await QuickLogin.enableFingerprint(_user)) return; // huỷ quét
         } else {
-          await QuickLogin.disableFingerprint();
+          await QuickLogin.disableFingerprint(_user.username);
         }
         if (mounted) setState(() => _fingerprint = on);
       }, done: on ? null : 'Đã tắt đăng nhập bằng vân tay');
@@ -150,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SwitchListTile(
                       secondary: const Icon(Icons.fingerprint),
                       title: const Text('Đăng nhập bằng vân tay'),
-                      subtitle: const Text('Dùng vân tay đã cài trên điện thoại này'),
+                      subtitle: Text('Riêng tài khoản @${_user.username} trên điện thoại này'),
                       value: _fingerprint,
                       onChanged: _busy ? null : _toggleFingerprint,
                     ),

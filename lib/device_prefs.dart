@@ -60,43 +60,65 @@ Future<void> saveSettings(AppSettings value) async {
 // ---------------- Đăng nhập nhanh ----------------
 
 /// Sau lần đăng nhập đầu: nhớ tên đăng nhập (cho nút khuôn mặt) và, nếu bật, giữ phiên để mở bằng vân tay.
+/// Phiên vân tay lưu RIÊNG từng tài khoản: 2 tài khoản trên 1 máy không ghi đè nhau,
+/// tài khoản nào tự bật thì mới dùng được.
 // ponytail: phiên vân tay dùng lại JWT 7 ngày; hết hạn thì phải đăng nhập mật khẩu + OTP lại.
 class QuickLogin {
   static const _usernameKey = 'last_username';
-  static const _bioKey = 'bio_token';
+  static const _bioKey = 'bio_tokens'; // JSON {tên đăng nhập: token}
 
   static Future<String?> lastUsername() => _storage.read(key: _usernameKey);
 
-  static Future<bool> fingerprintEnabled() async => await _storage.read(key: _bioKey) != null;
-
-  /// Gọi mỗi lần đăng nhập thành công.
-  static Future<void> remember(AppUser user) async {
-    await _storage.write(key: _usernameKey, value: user.username);
-    final token = api.token;
-    if (token != null && await fingerprintEnabled()) await _storage.write(key: _bioKey, value: token);
+  static Future<Map<String, String>> _tokens() async {
+    final raw = await _storage.read(key: _bioKey);
+    return raw == null ? {} : (jsonDecode(raw) as Map<String, dynamic>).cast<String, String>();
   }
 
-  /// Bật: phải quét vân tay thành công mới lưu phiên.
-  static Future<bool> enableFingerprint() async {
+  static Future<void> _saveTokens(Map<String, String> tokens) =>
+      _storage.write(key: _bioKey, value: jsonEncode(tokens));
+
+  static Future<bool> fingerprintEnabled(String username) async =>
+      (await _tokens()).containsKey(username.trim().toLowerCase());
+
+  /// Gọi mỗi lần đăng nhập thành công: chỉ làm mới phiên vân tay nếu CHÍNH tài khoản này đã bật.
+  static Future<void> remember(AppUser user) async {
+    await _storage.write(key: _usernameKey, value: user.username);
+    final tokens = await _tokens();
+    final token = api.token;
+    if (token != null && tokens.containsKey(user.username)) {
+      await _saveTokens({...tokens, user.username: token});
+    }
+  }
+
+  /// Bật cho tài khoản đang đăng nhập: phải quét vân tay thành công mới lưu phiên.
+  static Future<bool> enableFingerprint(AppUser user) async {
     final token = api.token;
     if (token == null) return false;
     if (!await _verify('Quét vân tay để bật đăng nhập bằng vân tay')) return false;
-    await _storage.write(key: _bioKey, value: token);
+    await _saveTokens({...await _tokens(), user.username: token});
     return true;
   }
 
-  static Future<void> disableFingerprint() => _storage.delete(key: _bioKey);
+  static Future<void> disableFingerprint(String username) async =>
+      _saveTokens({...await _tokens()}..remove(username));
 
-  /// Đăng nhập bằng vân tay; null nếu người dùng huỷ.
-  static Future<AppUser?> loginWithFingerprint() async {
-    final token = await _storage.read(key: _bioKey);
-    if (token == null) throw ApiException('Chưa bật đăng nhập bằng vân tay trên máy này');
-    if (!await _verify('Đăng nhập duong_gia_huy bằng vân tay')) return null;
+  /// Bị đăng xuất bắt buộc (hết phiên / bị khoá): bỏ phiên vân tay đang dùng token đó.
+  static Future<void> forgetToken(String? token) async {
+    if (token == null) return;
+    await _saveTokens({...await _tokens()}..removeWhere((_, t) => t == token));
+  }
+
+  /// Đăng nhập bằng vân tay vào [username]; null nếu người dùng huỷ.
+  static Future<AppUser?> loginWithFingerprint(String username) async {
+    final name = username.trim().toLowerCase();
+    final token = (await _tokens())[name];
+    if (token == null) throw ApiException('Tài khoản "$name" chưa bật đăng nhập bằng vân tay trên máy này');
+    if (!await _verify('Đăng nhập $name bằng vân tay')) return null;
     try {
       return await api.loginWithToken(token);
     } on ApiException catch (e) {
       if (e.status == 401) {
-        await disableFingerprint();
+        await disableFingerprint(name);
         throw ApiException('Phiên vân tay đã hết hạn, hãy đăng nhập bằng mật khẩu rồi bật lại');
       }
       rethrow;
