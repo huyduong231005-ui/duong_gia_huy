@@ -3,7 +3,7 @@
   "info": {
     "title": "duong_gia_huy API",
     "version": "1.0.0",
-    "description": "REST API cho app Flutter điểm danh sinh viên · Node.js + Express + MongoDB Atlas · deploy Render · nhóm 4 con tuất.\n\n**Cách thử:** gọi `POST /auth/login` (hoặc `/auth/register`) → nhận mã OTP qua email → `POST /auth/login/verify` trả về `token` → bấm **Authorize**, dán token.\n\nLỗi luôn có dạng `{\"message\": \"...\"}`. [File Excel mẫu](/mau-import.xlsx) · [Chính sách quyền riêng tư](/privacy) · [Mã nguồn GitHub](https://github.com/huyduong231005-ui/duong_gia_huy)"
+    "description": "REST API cho app Flutter điểm danh sinh viên · Node.js + Express + MongoDB Atlas · deploy Render · nhóm 4 con tuất.\n\n**Cách thử:** gọi `POST /auth/login` (hoặc `/auth/register`) → nhận mã OTP qua email → `POST /auth/login/verify` trả về `token` → bấm nút **Authorize** (góc phải), dán token (không cần chữ `Bearer`) → các API khác tự gửi kèm token.\n\nLỗi luôn có dạng `{\"message\": \"...\"}`. [File Excel mẫu](/mau-import.xlsx) · [Chính sách quyền riêng tư](/privacy) · [Mã nguồn GitHub](https://github.com/huyduong231005-ui/duong_gia_huy)"
   },
   "servers": [{ "url": "/" }],
   "security": [{ "bearer": [] }],
@@ -53,6 +53,7 @@
     "/auth/google": {
       "post": {
         "tags": ["Xác thực"], "summary": "Đăng nhập Google OAuth 2.0 (server xác thực idToken) → JWT", "security": [],
+        "description": "`idToken` là token **do Google cấp** khi bấm \"Tiếp tục với Google\" trong app Flutter (không thử được trực tiếp trên trang này). **Không** dán token JWT của API vào đây – token JWT dán ở nút **Authorize** phía trên.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["idToken"], "properties": { "idToken": { "type": "string" } } } } } },
         "responses": { "200": { "$ref": "#/components/responses/Token" }, "401": { "$ref": "#/components/responses/Error" } }
       }
