@@ -140,7 +140,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   validator: (v) => (v ?? '').isEmpty ? 'Nhập mật khẩu' : null,
                 ),
                 const SizedBox(height: 24),
-                LoadingButton(label: 'Đăng nhập', loading: _loading, onPressed: _login),
+                // Nút đăng nhập + 2 biểu tượng đăng nhập nhanh cùng hàng, cùng chiều cao
+                Row(children: [
+                  Expanded(child: LoadingButton(label: 'Đăng nhập', loading: _loading, onPressed: _login)),
+                  const SizedBox(width: 8),
+                  _QuickIcon(
+                    icon: Icons.face_retouching_natural,
+                    tooltip: 'Đăng nhập bằng khuôn mặt',
+                    onPressed: _loading ? null : _loginWithFace,
+                  ),
+                  if (_fingerprint) ...[
+                    const SizedBox(width: 8),
+                    _QuickIcon(
+                      icon: Icons.fingerprint,
+                      tooltip: 'Đăng nhập bằng vân tay',
+                      onPressed: _loading ? null : _loginWithFingerprint,
+                    ),
+                  ],
+                ]),
                 const SizedBox(height: 20),
                 Row(children: [
                   const Expanded(child: Divider()),
@@ -151,20 +168,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Expanded(child: Divider()),
                 ]),
                 const SizedBox(height: 20),
-                if (_fingerprint) ...[
-                  OutlinedButton.icon(
-                    onPressed: _loading ? null : _loginWithFingerprint,
-                    icon: const Icon(Icons.fingerprint),
-                    label: const Text('Đăng nhập bằng vân tay'),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                OutlinedButton.icon(
-                  onPressed: _loading ? null : _loginWithFace,
-                  icon: const Icon(Icons.face_retouching_natural),
-                  label: const Text('Đăng nhập bằng khuôn mặt'),
-                ),
-                const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _loading ? null : _loginWithGoogle,
                   icon: const Icon(Icons.g_mobiledata_rounded, size: 32),
@@ -181,6 +184,26 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
+        ),
+      );
+}
+
+/// Nút vuông nhỏ cạnh nút Đăng nhập (khuôn mặt / vân tay), cao bằng nút chính.
+class _QuickIcon extends StatelessWidget {
+  const _QuickIcon({required this.icon, required this.tooltip, required this.onPressed});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton.filledTonal(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon, size: 28),
+        style: IconButton.styleFrom(
+          fixedSize: const Size(52, 52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       );
 }
