@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'device_prefs.dart';
 import 'google_auth.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await loadSettings();
   api.onUnauthorized = (message) => logout(message: message);
   runApp(const DiemDanhApp());
 }
@@ -22,6 +25,8 @@ Future<void> logout({String? message}) async {
   try {
     await api.logout();
     await googleSignOut();
+    // Bị đăng xuất bắt buộc (hết phiên / bị khoá) thì phiên lưu cho vân tay cũng không dùng được nữa
+    if (message != null) await QuickLogin.disableFingerprint();
     navigatorKey.currentState
         ?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
     if (message != null) messengerKey.currentState?.showSnackBar(SnackBar(content: Text(message)));
@@ -30,10 +35,8 @@ Future<void> logout({String? message}) async {
   }
 }
 
-const _seed = Color(0xFF0F766E); // xanh mòng két
-
-ThemeData _theme(Brightness brightness) {
-  final scheme = ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
+ThemeData _theme(Color seed, Brightness brightness) {
+  final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
   final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
   return ThemeData(
     colorScheme: scheme,
@@ -62,21 +65,33 @@ Widget homeFor(AppUser user) => switch (user.role) {
     };
 
 /// Thay toàn bộ ngăn xếp màn hình (không quay lại được màn đăng nhập/OTP).
-void goHome(BuildContext context, AppUser user) => Navigator.of(context)
-    .pushAndRemoveUntil(MaterialPageRoute(builder: (_) => homeFor(user)), (_) => false);
+/// Mọi cách đăng nhập thành công đều đi qua đây: nhớ tài khoản cho lần sau (khuôn mặt, vân tay).
+void goHome(BuildContext context, AppUser user) {
+  QuickLogin.remember(user);
+  Navigator.of(context)
+      .pushAndRemoveUntil(MaterialPageRoute(builder: (_) => homeFor(user)), (_) => false);
+}
 
 class DiemDanhApp extends StatelessWidget {
   const DiemDanhApp({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        navigatorKey: navigatorKey,
-        scaffoldMessengerKey: messengerKey,
-        title: 'duong_gia_huy', // tên trong danh sách ứng dụng gần đây; tên dưới icon ở AndroidManifest
-        debugShowCheckedModeBanner: false,
-        theme: _theme(Brightness.light),
-        darkTheme: _theme(Brightness.dark),
-        home: const _StartGate(),
+  Widget build(BuildContext context) => ValueListenableBuilder(
+        valueListenable: settings, // đổi trong Cài đặt là áp dụng ngay
+        builder: (context, s, _) => MaterialApp(
+          navigatorKey: navigatorKey,
+          scaffoldMessengerKey: messengerKey,
+          title: 'duong_gia_huy', // tên trong danh sách ứng dụng gần đây; tên dưới icon ở AndroidManifest
+          debugShowCheckedModeBanner: false,
+          theme: _theme(Color(s.seed), Brightness.light),
+          darkTheme: _theme(Color(s.seed), Brightness.dark),
+          themeMode: s.themeMode,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(s.textScale)),
+            child: child!,
+          ),
+          home: const _StartGate(),
+        ),
       );
 }
 

@@ -47,6 +47,7 @@ dependencies:
   tflite_flutter: 0.12.1
   image: 4.10.1
   file_picker: ^13.3.0
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_test:

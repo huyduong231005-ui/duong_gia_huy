@@ -47,3 +47,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Cung cấp Theme.AppCompat cho LaunchTheme (yêu cầu của local_auth – đăng nhập vân tay).
+    implementation("androidx.appcompat:appcompat:1.7.0")
+}

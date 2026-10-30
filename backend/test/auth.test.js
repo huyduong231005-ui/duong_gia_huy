@@ -143,6 +143,22 @@ test('Google gắn vào tài khoản email đã có', async () => {
   assert.equal(g.body.user.username, 'duonggiahuy');
 });
 
+test('tự cập nhật hồ sơ và đổi mật khẩu (phải đúng mật khẩu hiện tại)', async () => {
+  const { body } = await registerAndVerify();
+  const token = body.token;
+  assert.equal((await call('PATCH', '/me', { fullName: '  Huy Mới  ' }, token)).body.fullName, 'Huy Mới');
+  assert.equal((await call('PATCH', '/me', { fullName: '' }, token)).status, 400);
+  assert.equal((await call('PATCH', '/me', { role: 'admin' }, token)).body.role, 'student', 'không tự nâng quyền được');
+
+  const wrong = await call('PATCH', '/me', { currentPassword: 'sai', newPassword: 'moi123456' }, token);
+  assert.match(wrong.body.message, /hiện tại không đúng/);
+  assert.equal((await call('PATCH', '/me', { currentPassword: '123456', newPassword: '12' }, token)).status, 400);
+  assert.equal((await call('PATCH', '/me', { currentPassword: '123456', newPassword: 'moi123456' }, token)).status, 200);
+
+  assert.equal((await call('POST', '/auth/login', { username: 'duonggiahuy', password: '123456' })).status, 401);
+  assert.equal((await call('POST', '/auth/login', { username: 'duonggiahuy', password: 'moi123456' })).status, 200);
+});
+
 test('/me cần token hợp lệ', async () => {
   assert.equal((await call('GET', '/me')).status, 401);
   assert.equal((await call('GET', '/me', null, 'rac')).status, 401);

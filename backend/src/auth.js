@@ -45,6 +45,29 @@ export function requireAuth(jwtSecret, ...roles) {
   };
 }
 
+const MAX_FULLNAME = 100;
+
+/** PATCH /me: tự cập nhật hồ sơ (họ tên) và đổi mật khẩu (phải nhập đúng mật khẩu hiện tại). */
+export async function updateProfile(req, res) {
+  const { user } = req;
+  if (req.body?.fullName !== undefined) {
+    const fullName = str(req.body.fullName);
+    if (!fullName || fullName.length > MAX_FULLNAME) throw new HttpError(400, `Họ tên 1–${MAX_FULLNAME} ký tự`);
+    user.fullName = fullName;
+  }
+  const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+  if (newPassword) {
+    if (newPassword.length < MIN_PASSWORD) throw new HttpError(400, `Mật khẩu mới tối thiểu ${MIN_PASSWORD} ký tự`);
+    const current = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+    // Tài khoản tạo bằng Google chưa có mật khẩu thì cho đặt mới luôn
+    if (user.passwordHash && !(await bcrypt.compare(current, user.passwordHash))) {
+      throw new HttpError(400, 'Mật khẩu hiện tại không đúng');
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+  }
+  res.json(await user.save());
+}
+
 export function authRouter({ sendMail, verifyGoogle, jwtSecret }) {
   const router = Router();
   const session = (user) => ({ token: signToken(user, jwtSecret), user });

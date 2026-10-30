@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../api.dart';
+import '../device_prefs.dart';
 import '../google_auth.dart';
 import '../main.dart';
 import 'auth_widgets.dart';
@@ -20,6 +21,29 @@ class _LoginScreenState extends State<LoginScreen> {
   final _password = TextEditingController();
   bool _loading = false;
   bool _hidePassword = true;
+  bool _fingerprint = false; // chỉ hiện nút vân tay khi người dùng đã bật trong Cài đặt
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuickLogin();
+  }
+
+  /// Điền sẵn tài khoản lần trước để bấm khuôn mặt / vân tay là vào luôn.
+  Future<void> _loadQuickLogin() async {
+    final last = await QuickLogin.lastUsername();
+    final fingerprint = await QuickLogin.fingerprintEnabled();
+    if (!mounted) return;
+    setState(() {
+      if (_username.text.isEmpty && last != null) _username.text = last;
+      _fingerprint = fingerprint;
+    });
+  }
+
+  Future<void> _loginWithFingerprint() => _run(() async {
+        final user = await QuickLogin.loginWithFingerprint();
+        if (user != null && mounted) goHome(context, user);
+      });
 
   @override
   void dispose() {
@@ -127,6 +151,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Expanded(child: Divider()),
                 ]),
                 const SizedBox(height: 20),
+                if (_fingerprint) ...[
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : _loginWithFingerprint,
+                    icon: const Icon(Icons.fingerprint),
+                    label: const Text('Đăng nhập bằng vân tay'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 OutlinedButton.icon(
                   onPressed: _loading ? null : _loginWithFace,
                   icon: const Icon(Icons.face_retouching_natural),

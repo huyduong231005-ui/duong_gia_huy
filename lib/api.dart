@@ -171,6 +171,25 @@ class Api {
   Future<AppUser> deleteFace() async =>
       AppUser.fromJson(await _send('DELETE', '/me/face') as Map<String, dynamic>);
 
+  /// Token phiên hiện tại (để lưu cho đăng nhập vân tay).
+  String? get token => _token;
+
+  /// Dùng lại 1 phiên đã lưu (đăng nhập vân tay): kiểm tra với /me rồi lưu làm phiên hiện tại.
+  Future<AppUser> loginWithToken(String token) async {
+    _token = token;
+    try {
+      final user = AppUser.fromJson(await _send('GET', '/me') as Map<String, dynamic>);
+      await _storage.write(key: _tokenKey, value: token);
+      return user;
+    } on ApiException {
+      _token = null;
+      rethrow;
+    }
+  }
+
+  Future<AppUser> updateProfile(Map<String, dynamic> changes) async =>
+      AppUser.fromJson(await _send('PATCH', '/me', changes) as Map<String, dynamic>);
+
   /// Mở app: còn token hợp lệ thì vào thẳng, không thì về màn đăng nhập.
   Future<AppUser?> restoreSession() async {
     _token = await _storage.read(key: _tokenKey);

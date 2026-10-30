@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
-import '../face/face_math.dart';
-import '../widgets/crud_kit.dart';
 import 'admin_screens.dart';
-import 'face_scan_screen.dart';
 import 'attendance_history_screen.dart';
 import 'class_screens.dart';
 import 'leaves_screen.dart';
-import '../main.dart' show logout;
+import '../main.dart' show logout, goHome;
 import 'qr_screens.dart';
+import 'settings_screen.dart';
 import 'spot_check_screen.dart';
 import 'today_screen.dart';
 
@@ -76,66 +74,6 @@ class StudentHome extends StatelessWidget {
       ));
 }
 
-/// Bật / đăng ký lại / tắt đăng nhập bằng khuôn mặt.
-class _FaceCard extends StatefulWidget {
-  const _FaceCard({required this.user});
-  final AppUser user;
-
-  @override
-  State<_FaceCard> createState() => _FaceCardState();
-}
-
-class _FaceCardState extends State<_FaceCard> {
-  static const _enrollShots = 5; // mẫu = trung bình 5 ảnh
-
-  late bool _hasFace = widget.user.hasFace;
-  bool _busy = false;
-
-  Future<void> _enroll() async {
-    final shots = await Navigator.of(context).push<List<List<double>>>(MaterialPageRoute(
-      builder: (_) => const FaceScanScreen(title: 'Đăng ký khuôn mặt', shots: _enrollShots),
-    ));
-    if (shots == null || !mounted) return;
-    await _save(() => api.saveFace(averageEmbeddings(shots)), 'Đã bật đăng nhập bằng khuôn mặt');
-  }
-
-  Future<void> _remove() => _save(api.deleteFace, 'Đã tắt đăng nhập bằng khuôn mặt');
-
-  Future<void> _save(Future<AppUser> Function() action, String done) async {
-    setState(() => _busy = true);
-    await runApi(context, () async {
-      final user = await action();
-      if (mounted) setState(() => _hasFace = user.hasFace);
-    }, done: done);
-    if (mounted) setState(() => _busy = false);
-  }
-
-  @override
-  Widget build(BuildContext context) => Card.outlined(
-        child: ListTile(
-          leading: Icon(_hasFace ? Icons.face_retouching_natural : Icons.face_outlined,
-              color: _hasFace ? Colors.green : null),
-          title: const Text('Đăng nhập bằng khuôn mặt'),
-          subtitle: Text(_hasFace ? 'Đã bật · chỉ lưu vector 512 số, không lưu ảnh' : 'Chưa bật · quét mặt 1 lần để bật'),
-          trailing: _busy
-              ? const SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
-              : _hasFace
-                  ? PopupMenuButton<VoidCallback>(
-                      onSelected: (action) => action(),
-                      itemBuilder: (_) => [
-                        PopupMenuItem(value: _enroll, child: const Text('Quét lại khuôn mặt')),
-                        PopupMenuItem(value: _remove, child: const Text('Tắt')),
-                      ],
-                    )
-                  : FilledButton.tonal(
-                      style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-                      onPressed: _enroll,
-                      child: const Text('Bật'),
-                    ),
-        ),
-      );
-}
-
 class _RoleHome extends StatelessWidget {
   const _RoleHome({
     required this.user,
@@ -168,6 +106,18 @@ class _RoleHome extends StatelessWidget {
         title: Text(title),
         actions: [
           IconButton(
+            tooltip: 'Cài đặt',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () async {
+              final updated = await Navigator.of(context)
+                  .push<AppUser>(MaterialPageRoute(builder: (_) => SettingsScreen(user: user)));
+              // Đổi họ tên thì vẽ lại trang chủ với thông tin mới
+              if (updated != null && updated.displayName != user.displayName && context.mounted) {
+                goHome(context, updated);
+              }
+            },
+          ),
+          IconButton(
             tooltip: 'Đăng xuất',
             icon: const Icon(Icons.logout),
             onPressed: logout,
@@ -191,8 +141,6 @@ class _RoleHome extends StatelessWidget {
               subtitle: Text('$roleLabel · ${user.email}'),
             ),
           ),
-          const SizedBox(height: 8),
-          _FaceCard(user: user),
           const SizedBox(height: 16),
           GridView.count(
             crossAxisCount: 2,
