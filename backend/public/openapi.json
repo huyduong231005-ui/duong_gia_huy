@@ -1,0 +1,302 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "duong_gia_huy API",
+    "version": "1.0.0",
+    "description": "REST API cho app Flutter điểm danh sinh viên · Node.js + Express + MongoDB Atlas · deploy Render · nhóm 4 con tuất.\n\n**Cách thử:** gọi `POST /auth/login` (hoặc `/auth/register`) → nhận mã OTP qua email → `POST /auth/login/verify` trả về `token` → bấm **Authorize**, dán token.\n\nLỗi luôn có dạng `{\"message\": \"...\"}`. [File Excel mẫu](/mau-import.xlsx) · [Chính sách quyền riêng tư](/privacy) · [Mã nguồn GitHub](https://github.com/huyduong231005-ui/duong_gia_huy)"
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "bearer": [] }],
+  "tags": [
+    { "name": "Hệ thống" },
+    { "name": "Xác thực" },
+    { "name": "Tài khoản của tôi" },
+    { "name": "Quản trị (admin)" },
+    { "name": "Lớp học & buổi học" },
+    { "name": "Điểm danh QR + GPS" },
+    { "name": "Kiểm tra đột xuất" },
+    { "name": "Đơn xin nghỉ" }
+  ],
+  "paths": {
+    "/health": {
+      "get": { "tags": ["Hệ thống"], "summary": "Kiểm tra server đang chạy", "security": [], "responses": { "200": { "description": "{\"ok\": true}" } } }
+    },
+
+    "/auth/register": {
+      "post": {
+        "tags": ["Xác thực"], "summary": "Đăng ký bằng email → gửi OTP", "security": [],
+        "requestBody": { "$ref": "#/components/requestBodies/Register" },
+        "responses": { "201": { "description": "Đã gửi OTP tới email" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/auth/register/verify": {
+      "post": {
+        "tags": ["Xác thực"], "summary": "Xác minh OTP đăng ký → JWT", "security": [],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["email", "code"], "properties": { "email": { "type": "string", "example": "sv@gmail.com" }, "code": { "type": "string", "example": "123456" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Token" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Xác thực"], "summary": "Tên đăng nhập + mật khẩu → gửi Email OTP", "security": [],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["username", "password"], "properties": { "username": { "type": "string" }, "password": { "type": "string", "format": "password" } } } } } },
+        "responses": { "200": { "description": "Đã gửi OTP, trả về email đã che" }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/auth/login/verify": {
+      "post": {
+        "tags": ["Xác thực"], "summary": "Xác minh OTP đăng nhập → JWT", "security": [],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["username", "code"], "properties": { "username": { "type": "string" }, "code": { "type": "string", "example": "123456" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Token" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/auth/google": {
+      "post": {
+        "tags": ["Xác thực"], "summary": "Đăng nhập Google OAuth 2.0 (server xác thực idToken) → JWT", "security": [],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["idToken"], "properties": { "idToken": { "type": "string" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Token" }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/auth/face": {
+      "post": {
+        "tags": ["Xác thực"], "summary": "Đăng nhập bằng khuôn mặt (vector FaceNet-512) → JWT", "security": [],
+        "description": "So khoảng cách Euclid với mẫu đã lưu (ngưỡng 0.65). Sai 5 lần thì khoá đăng nhập khuôn mặt tới khi đăng nhập bằng OTP.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["username", "embeddings"], "properties": { "username": { "type": "string" }, "embeddings": { "type": "array", "items": { "$ref": "#/components/schemas/Embedding" } } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Token" }, "401": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+
+    "/me": {
+      "get": { "tags": ["Tài khoản của tôi"], "summary": "Thông tin tài khoản đang đăng nhập", "responses": { "200": { "description": "User" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "patch": {
+        "tags": ["Tài khoản của tôi"], "summary": "Cập nhật hồ sơ / đổi mật khẩu",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "fullName": { "type": "string" }, "currentPassword": { "type": "string", "format": "password" }, "newPassword": { "type": "string", "format": "password", "minLength": 6 } } } } } },
+        "responses": { "200": { "description": "User sau khi sửa" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/me/face": {
+      "put": {
+        "tags": ["Tài khoản của tôi"], "summary": "Bật đăng nhập khuôn mặt (lưu vector, không lưu ảnh)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["embedding"], "properties": { "embedding": { "$ref": "#/components/schemas/Embedding" } } } } } },
+        "responses": { "200": { "description": "User (hasFace = true)" }, "400": { "$ref": "#/components/responses/Error" } }
+      },
+      "delete": { "tags": ["Tài khoản của tôi"], "summary": "Tắt đăng nhập khuôn mặt", "responses": { "200": { "description": "User (hasFace = false)" } } }
+    },
+
+    "/admin/users": {
+      "get": {
+        "tags": ["Quản trị (admin)"], "summary": "Danh sách tài khoản",
+        "parameters": [
+          { "name": "role", "in": "query", "schema": { "$ref": "#/components/schemas/Role" } },
+          { "name": "q", "in": "query", "description": "Tìm theo tên đăng nhập, email, họ tên", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Mảng User" }, "403": { "$ref": "#/components/responses/Error" } }
+      },
+      "post": {
+        "tags": ["Quản trị (admin)"], "summary": "Tạo tài khoản",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["email", "username", "password"], "properties": { "email": { "type": "string" }, "username": { "type": "string" }, "password": { "type": "string", "format": "password" }, "fullName": { "type": "string" }, "role": { "$ref": "#/components/schemas/Role" } } } } } },
+        "responses": { "201": { "description": "User" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/admin/users/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "patch": {
+        "tags": ["Quản trị (admin)"], "summary": "Sửa tài khoản (họ tên, vai trò, khoá, đặt lại mật khẩu)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "fullName": { "type": "string" }, "role": { "$ref": "#/components/schemas/Role" }, "active": { "type": "boolean" }, "password": { "type": "string", "format": "password" } } } } } },
+        "responses": { "200": { "description": "User" }, "404": { "$ref": "#/components/responses/Error" } }
+      },
+      "delete": { "tags": ["Quản trị (admin)"], "summary": "Xoá tài khoản", "responses": { "204": { "description": "Đã xoá" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/admin/subjects": {
+      "get": {
+        "tags": ["Quản trị (admin)"], "summary": "Danh sách môn học",
+        "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Mảng Subject" } }
+      },
+      "post": {
+        "tags": ["Quản trị (admin)"], "summary": "Thêm môn học",
+        "requestBody": { "$ref": "#/components/requestBodies/Subject" },
+        "responses": { "201": { "description": "Subject" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/admin/subjects/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "patch": { "tags": ["Quản trị (admin)"], "summary": "Sửa môn học", "requestBody": { "$ref": "#/components/requestBodies/Subject" }, "responses": { "200": { "description": "Subject" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["Quản trị (admin)"], "summary": "Xoá môn học (chặn nếu còn lớp dùng)", "responses": { "204": { "description": "Đã xoá" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/admin/classes": {
+      "post": {
+        "tags": ["Quản trị (admin)"], "summary": "Tạo lớp học phần + thời khoá biểu",
+        "requestBody": { "$ref": "#/components/requestBodies/ClassSection" },
+        "responses": { "201": { "description": "ClassSection" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/admin/classes/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "patch": { "tags": ["Quản trị (admin)"], "summary": "Sửa lớp học phần", "requestBody": { "$ref": "#/components/requestBodies/ClassSection" }, "responses": { "200": { "description": "ClassSection" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["Quản trị (admin)"], "summary": "Xoá lớp học phần", "responses": { "204": { "description": "Đã xoá" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/admin/classes/{id}/students": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "post": {
+        "tags": ["Quản trị (admin)"], "summary": "Ghi danh sinh viên vào lớp",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["studentId"], "properties": { "studentId": { "type": "string" } } } } } },
+        "responses": { "201": { "description": "ClassSection" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/admin/classes/{id}/students/{studentId}": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }, { "$ref": "#/components/parameters/studentId" }],
+      "delete": { "tags": ["Quản trị (admin)"], "summary": "Bỏ ghi danh sinh viên", "responses": { "200": { "description": "ClassSection" } } }
+    },
+    "/admin/import": {
+      "post": {
+        "tags": ["Quản trị (admin)"], "summary": "Nhập Excel thời khoá biểu + danh sách sinh viên",
+        "description": "Gửi nguyên file .xlsx (tối đa 5 MB) gồm 2 sheet `ThoiKhoaBieu` và `SinhVien`. Xem [file mẫu](/mau-import.xlsx).",
+        "requestBody": { "required": true, "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+        "responses": { "200": { "description": "Thống kê số lớp / tài khoản / ghi danh đã tạo" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+
+    "/classes": {
+      "get": { "tags": ["Lớp học & buổi học"], "summary": "Lớp học phần (admin: tất cả, GV: lớp mình dạy, SV: lớp mình học)", "responses": { "200": { "description": "Mảng ClassSection" } } }
+    },
+    "/classes/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "get": { "tags": ["Lớp học & buổi học"], "summary": "Chi tiết lớp + danh sách sinh viên", "responses": { "200": { "description": "ClassSection" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/me/today": {
+      "get": { "tags": ["Lớp học & buổi học"], "summary": "Lịch học hôm nay theo thời khoá biểu (giờ Việt Nam)", "responses": { "200": { "description": "Danh sách buổi học hôm nay" } } }
+    },
+    "/classes/{id}/sessions": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "get": { "tags": ["Lớp học & buổi học"], "summary": "Danh sách buổi điểm danh của lớp", "responses": { "200": { "description": "Mảng Session" } } },
+      "post": {
+        "tags": ["Lớp học & buổi học"], "summary": "Mở buổi điểm danh (GV) – ngoài giờ thời khoá biểu thì ghi là buổi bù",
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "date": { "type": "string", "example": "2026-10-30", "description": "Mặc định hôm nay" }, "topic": { "type": "string" } } } } } },
+        "responses": { "201": { "description": "Session" }, "403": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/sessions/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "get": { "tags": ["Lớp học & buổi học"], "summary": "Chi tiết buổi + trạng thái điểm danh từng SV", "responses": { "200": { "description": "Session" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "patch": {
+        "tags": ["Lớp học & buổi học"], "summary": "Sửa buổi, đóng / mở điểm danh, ghim vị trí lớp",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "date": { "type": "string" }, "topic": { "type": "string" }, "open": { "type": "boolean" }, "lat": { "type": "number" }, "lng": { "type": "number" }, "radius": { "type": "number", "example": 100 } } } } } },
+        "responses": { "200": { "description": "Session" } }
+      },
+      "delete": { "tags": ["Lớp học & buổi học"], "summary": "Xoá buổi", "responses": { "204": { "description": "Đã xoá" } } }
+    },
+    "/sessions/{id}/records/{studentId}": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }, { "$ref": "#/components/parameters/studentId" }],
+      "patch": {
+        "tags": ["Lớp học & buổi học"], "summary": "GV đổi trạng thái điểm danh 1 sinh viên",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["status"], "properties": { "status": { "$ref": "#/components/schemas/Attendance" } } } } } },
+        "responses": { "200": { "description": "Session" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+
+    "/sessions/{id}/qr": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "get": { "tags": ["Điểm danh QR + GPS"], "summary": "Mã QR động ký HMAC, đổi mỗi 60 giây (GV)", "responses": { "200": { "description": "{ token, refreshInMs }" }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/checkin": {
+      "post": {
+        "tags": ["Điểm danh QR + GPS"], "summary": "Sinh viên quét QR + gửi GPS (bán kính 100 m, chặn GPS giả)",
+        "description": "Quá 15 phút sau khi mở buổi thì ghi là đi muộn.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "allOf": [{ "type": "object", "required": ["token"], "properties": { "token": { "type": "string", "description": "Nội dung mã QR" } } }, { "$ref": "#/components/schemas/Location" }] } } } },
+        "responses": { "200": { "description": "Kết quả điểm danh (present / late, khoảng cách)" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/me/attendance": {
+      "get": { "tags": ["Điểm danh QR + GPS"], "summary": "Lịch sử chuyên cần + số buổi còn được vắng (20%)", "responses": { "200": { "description": "Theo từng lớp" } } }
+    },
+
+    "/sessions/{id}/spot-checks": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "post": {
+        "tags": ["Kiểm tra đột xuất"], "summary": "GV gọi ngẫu nhiên SV xác minh lại trong 2 phút",
+        "description": "SV được gọi tạm ghi \"left\" (rời lớp sớm), xác minh kịp thì khôi phục trạng thái cũ.",
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "percent": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } } } } } },
+        "responses": { "201": { "description": "Danh sách SV bị gọi" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/me/spot-check": {
+      "get": { "tags": ["Kiểm tra đột xuất"], "summary": "SV kiểm tra mình có đang bị gọi không", "responses": { "200": { "description": "null hoặc { sessionId, deadline }" } } }
+    },
+    "/spot-checks/respond": {
+      "post": {
+        "tags": ["Kiểm tra đột xuất"], "summary": "SV xác minh bằng khuôn mặt + GPS",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "allOf": [{ "type": "object", "required": ["sessionId", "embeddings"], "properties": { "sessionId": { "type": "string" }, "embeddings": { "type": "array", "items": { "$ref": "#/components/schemas/Embedding" } } } }, { "$ref": "#/components/schemas/Location" }] } } } },
+        "responses": { "200": { "description": "Đã xác minh" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+
+    "/leaves": {
+      "get": { "tags": ["Đơn xin nghỉ"], "summary": "Danh sách đơn (SV: của mình, GV: lớp mình dạy, admin: tất cả)", "responses": { "200": { "description": "Mảng LeaveRequest" } } },
+      "post": {
+        "tags": ["Đơn xin nghỉ"], "summary": "SV gửi đơn xin nghỉ",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["classId", "date", "reason"], "properties": { "classId": { "type": "string" }, "date": { "type": "string", "example": "2026-10-30" }, "reason": { "type": "string" } } } } } },
+        "responses": { "201": { "description": "LeaveRequest" }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/leaves/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/id" }],
+      "patch": {
+        "tags": ["Đơn xin nghỉ"], "summary": "SV sửa đơn đang chờ · GV duyệt / từ chối (duyệt → có phép)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "date": { "type": "string" }, "reason": { "type": "string" }, "status": { "type": "string", "enum": ["approved", "rejected"] } } } } } },
+        "responses": { "200": { "description": "LeaveRequest" }, "403": { "$ref": "#/components/responses/Error" } }
+      },
+      "delete": { "tags": ["Đơn xin nghỉ"], "summary": "SV rút đơn đang chờ", "responses": { "204": { "description": "Đã xoá" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" } },
+    "parameters": {
+      "id": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+      "studentId": { "name": "studentId", "in": "path", "required": true, "schema": { "type": "string" } }
+    },
+    "schemas": {
+      "Role": { "type": "string", "enum": ["admin", "lecturer", "student"] },
+      "Attendance": { "type": "string", "enum": ["present", "late", "absent", "excused", "left"] },
+      "Embedding": { "type": "array", "minItems": 512, "maxItems": 512, "items": { "type": "number" }, "description": "Vector FaceNet 512 số" },
+      "Location": {
+        "type": "object", "required": ["lat", "lng"],
+        "properties": { "lat": { "type": "number", "example": 10.853636 }, "lng": { "type": "number", "example": 106.788779 }, "mocked": { "type": "boolean", "description": "true = GPS giả → bị từ chối" } }
+      },
+      "Error": { "type": "object", "properties": { "message": { "type": "string" } } }
+    },
+    "requestBodies": {
+      "Register": {
+        "required": true,
+        "content": { "application/json": { "schema": { "type": "object", "required": ["email", "username", "password"], "properties": { "email": { "type": "string", "example": "sv@gmail.com" }, "username": { "type": "string" }, "fullName": { "type": "string" }, "password": { "type": "string", "format": "password", "minLength": 6 } } } } }
+      },
+      "Subject": {
+        "required": true,
+        "content": { "application/json": { "schema": { "type": "object", "properties": { "code": { "type": "string", "example": "IT008" }, "name": { "type": "string", "example": "Lập trình di động" }, "credits": { "type": "integer", "example": 4 } } } } }
+      },
+      "ClassSection": {
+        "required": true,
+        "content": { "application/json": { "schema": { "type": "object", "properties": {
+          "code": { "type": "string", "example": "IT008.Q11" },
+          "subject": { "type": "string", "description": "id môn học" },
+          "lecturer": { "type": "string", "description": "id giảng viên" },
+          "room": { "type": "string" },
+          "semester": { "type": "string", "example": "HK1 2026-2027" },
+          "plannedSessions": { "type": "integer", "example": 15 },
+          "startDate": { "type": "string", "example": "2026-09-07" },
+          "endDate": { "type": "string", "example": "2026-12-20" },
+          "meetings": { "type": "array", "items": { "type": "object", "properties": {
+            "weekday": { "type": "integer", "minimum": 1, "maximum": 7, "description": "1 = Thứ 2 … 7 = Chủ nhật" },
+            "start": { "type": "string", "example": "07:30" },
+            "end": { "type": "string", "example": "09:45" },
+            "room": { "type": "string" }
+          } } }
+        } } } }
+      }
+    },
+    "responses": {
+      "Token": { "description": "{ token, user } – dán token vào nút Authorize" },
+      "Error": { "description": "Lỗi", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    }
+  }
+}
